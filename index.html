@@ -420,8 +420,10 @@ select option{background:var(--input-bg);color:var(--input-color)}
     <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
   </div>
   <div class="metrics">
-    <div class="metric"><div class="metric-label">Renda do mês</div><div class="metric-value" id="m-renda" style="color:#155724">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">Total de gastos</div><div class="metric-value" id="m-gastos" style="color:#721c24">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">Renda do mês</div><div class="metric-value" id="m-renda" style="color:#1a7a3c">R$ 0</div></div>
+    <div class="metric" id="m-dizimo-wrap" style="display:none"><div class="metric-label">🙏 Dízimo</div><div class="metric-value" id="m-dizimo" style="color:#7c3aed">R$ 0</div></div>
+    <div class="metric" id="m-liquido-wrap" style="display:none"><div class="metric-label">Renda líquida</div><div class="metric-value" id="m-liquido" style="color:#1a7a3c">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">Total de gastos</div><div class="metric-value" id="m-gastos" style="color:#c0392b">R$ 0</div></div>
     <div class="metric"><div class="metric-label">Saldo</div><div class="metric-value" id="m-saldo">R$ 0</div></div>
   </div>
   <div class="legenda">
@@ -437,17 +439,11 @@ select option{background:var(--input-bg);color:var(--input-color)}
   </div>
   <div id="card-dizimo" style="display:none" class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="section-title" style="margin-bottom:0">🙏 Dízimo do mês</div>
+      <div class="section-title" style="margin-bottom:0">🙏 Dízimos do mês</div>
       <span id="dizimo-badge" class="badge"></span>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div>
-        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">10% da renda total</div>
-        <div id="dizimo-valor" style="font-size:26px;font-weight:700;color:#155724"></div>
-      </div>
-      <button id="dizimo-btn" class="action-btn" style="padding:8px 18px;font-size:13px" onclick="toggleDizimo()"></button>
-    </div>
-    <div id="dizimo-sub" style="font-size:12px;color:var(--text2);margin-top:8px"></div>
+    <div id="dizimo-resumo-totais" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="dizimo-lista-itens"></div>
   </div>
   <div class="card"><div class="section-title">Renda fixa ativa</div><div id="res-rendafixa"><div class="loading">Carregando...</div></div></div>
   <div class="card"><div class="section-title">Contas do mês</div><div id="res-contas"><div class="loading">Carregando...</div></div></div>
@@ -710,35 +706,108 @@ function renderConfDizimo(){
   const cfgEmail=document.getElementById('cfg-email');
   if(cfgEmail)cfgEmail.textContent=currentUser?.email||'';
 }
+function getDizimoItens(y,m){
+  // Retorna lista de itens de dízimo: {key, label, tipo, valor, dizimo, recolhido}
+  const key=ymKey(y,m);
+  const itens=[];
+  // Rendas avulsas do mês
+  cache.rendas.filter(r=>r.mes===key).forEach(r=>{
+    const dk='r_'+r.id;
+    itens.push({key:dk,label:r.desc,tipo:'avulsa',valor:Number(r.valor),dizimo:Number(r.valor)*0.1,recolhido:cacheDizimo[dk]===true});
+  });
+  // Rendas fixas ativas no mês
+  rfDoMes(y,m).forEach(rf=>{
+    const dk='rf_'+rf.id+'_'+key;
+    itens.push({key:dk,label:rf.desc,tipo:'fixa',valor:Number(rf.valor),dizimo:Number(rf.valor)*0.1,recolhido:cacheDizimo[dk]===true});
+  });
+  return itens;
+}
+function getDizimoTotais(y,m){
+  const itens=getDizimoItens(y,m);
+  const totalDev=itens.reduce((s,i)=>s+i.dizimo,0);
+  const totalRec=itens.filter(i=>i.recolhido).reduce((s,i)=>s+i.dizimo,0);
+  return{itens,totalDev,totalRec,pendente:totalDev-totalRec};
+}
 function renderDizimo(){
   const card=document.getElementById('card-dizimo');
   if(!card)return;
-  if(!dizimoAtivo()){card.style.display='none';return;}
-  card.style.display='block';
-  const renda=getRendaDoMes(viewYear,viewMonth);
-  const valor=renda*0.1;
-  const key=ymKey(viewYear,viewMonth);
-  const recolhido=cacheDizimo[key]===true;
-  document.getElementById('dizimo-valor').textContent=fmt(valor);
+  const ativo=dizimoAtivo();
+  card.style.display=ativo?'block':'none';
+  // mostrar/ocultar métricas de dízimo no topo
+  const wrapDiz=document.getElementById('m-dizimo-wrap');
+  const wrapLiq=document.getElementById('m-liquido-wrap');
+  if(wrapDiz)wrapDiz.style.display=ativo?'':'none';
+  if(wrapLiq)wrapLiq.style.display=ativo?'':'none';
+  if(!ativo)return;
+
+  const {itens,totalDev,totalRec,pendente}=getDizimoTotais(viewYear,viewMonth);
+  const todos=itens.length;
+  const recolhidos=itens.filter(i=>i.recolhido).length;
+
+  // badge geral
   const badge=document.getElementById('dizimo-badge');
-  const btn=document.getElementById('dizimo-btn');
-  const sub=document.getElementById('dizimo-sub');
-  if(recolhido){
-    badge.textContent='✅ Recolhido';badge.style.background='#d4edda';badge.style.color='#155724';
-    btn.textContent='Desmarcar';btn.style.borderColor='#28a745';
-    sub.textContent='Dízimo recolhido neste mês. Que Deus abençoe!';
-  }else{
-    badge.textContent='⏳ Pendente';badge.style.background='#fff3cd';badge.style.color='#856404';
-    btn.textContent='Marcar como recolhido';btn.style.borderColor='var(--border)';
-    sub.textContent=`Base de cálculo: ${fmt(renda)} de renda total em ${mesStr(viewYear,viewMonth)}`;
+  if(badge){
+    if(todos===0){badge.textContent='Sem rendas';badge.style.background='var(--metric-bg)';badge.style.color='var(--text2)';}
+    else if(recolhidos===todos){badge.textContent='✅ Todos recolhidos';badge.style.background='#d4edda';badge.style.color='#155724';}
+    else if(recolhidos===0){badge.textContent='⏳ Nenhum recolhido';badge.style.background='#fff3cd';badge.style.color='#856404';}
+    else{badge.textContent=`⏳ ${recolhidos}/${todos} recolhidos`;badge.style.background='#fff3cd';badge.style.color='#856404';}
+  }
+
+  // totais no card
+  const totaisEl=document.getElementById('dizimo-resumo-totais');
+  if(totaisEl) totaisEl.innerHTML=`
+    <div class="metric" style="min-width:80px"><div class="metric-label">Total devido</div><div class="metric-value" style="color:#7c3aed;font-size:17px">${fmt(totalDev)}</div></div>
+    <div class="metric" style="min-width:80px"><div class="metric-label">Recolhido</div><div class="metric-value" style="color:#16a34a;font-size:17px">${fmt(totalRec)}</div></div>
+    <div class="metric" style="min-width:80px"><div class="metric-label">Pendente</div><div class="metric-value" style="color:${pendente>0?'#c0392b':'#16a34a'};font-size:17px">${fmt(pendente)}</div></div>`;
+
+  // lista individual
+  const listaEl=document.getElementById('dizimo-lista-itens');
+  if(listaEl){
+    if(!itens.length){listaEl.innerHTML='<div class="empty">Nenhuma renda lançada neste mês</div>';}
+    else{
+      listaEl.innerHTML=itens.map(i=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:9px 0;border-top:1px solid var(--row-item-border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${i.recolhido?'✅ ':''}<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${i.tipo==='fixa'?'#d4edda':'#dbeafe'};color:${i.tipo==='fixa'?'#155724':'#1e40af'};margin-right:4px">${i.tipo==='fixa'?'fixa':'avulsa'}</span>${i.label}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">Renda: ${fmt(i.valor)} · Dízimo (10%): <strong style="color:#7c3aed">${fmt(i.dizimo)}</strong></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            ${i.recolhido
+              ?`<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#d4edda;color:#155724;font-weight:600">Recolhido</span>
+                 <button class="action-btn" onclick="toggleDizimoItem('${i.key}')">Desmarcar</button>`
+              :`<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#fff3cd;color:#856404;font-weight:600">Pendente</span>
+                 <button class="action-btn" onclick="toggleDizimoItem('${i.key}')">Marcar recolhido</button>`
+            }
+          </div>
+        </div>`).join('');
+    }
   }
 }
+function toggleDizimoItem(dk){
+  cacheDizimo[dk]=!cacheDizimo[dk];
+  saveDizimo();
+  renderDizimo();
+  // atualizar métricas do topo
+  atualizarMetricasDizimo();
+  toast(cacheDizimo[dk]?'Dízimo recolhido! 🙏':'Dízimo desmarcado.');
+}
+// mantém compatibilidade com modal de aviso antigo
 function toggleDizimo(){
+  // chamado pelo modal de aviso pós-renda (marca a renda recém lançada)
   const key=ymKey(viewYear,viewMonth);
   cacheDizimo[key]=!cacheDizimo[key];
   saveDizimo();
   renderDizimo();
-  toast(cacheDizimo[key]?'Dízimo marcado como recolhido! 🙏':'Dízimo desmarcado.');
+}
+function atualizarMetricasDizimo(){
+  if(!dizimoAtivo())return;
+  const {totalDev}=getDizimoTotais(viewYear,viewMonth);
+  const renda=getRendaDoMes(viewYear,viewMonth);
+  const liquido=renda-totalDev;
+  const mDiz=document.getElementById('m-dizimo');
+  const mLiq=document.getElementById('m-liquido');
+  if(mDiz)mDiz.textContent=fmt(totalDev);
+  if(mLiq){mLiq.textContent=fmt(liquido);mLiq.style.color=liquido>=0?'#1a7a3c':'#c0392b';}
 }
 
 // ===== TEMA =====
@@ -972,26 +1041,27 @@ function calcParcela(){
 }
 
 // ===== AVISO DÍZIMO PÓS-RENDA =====
-function mostrarAvisoDizimo(desc,valor,mes){
+let dizimoAvisoKey=''; // chave individual do item de dízimo
+function mostrarAvisoDizimo(desc,valor,dizimoKey){
   if(!dizimoAtivo())return;
-  mesAvisoDizimo=mes;
+  dizimoAvisoKey=dizimoKey;
   document.getElementById('aviso-renda-desc').textContent=desc;
   document.getElementById('aviso-dizimo-valor').textContent=fmt(valor*0.1);
-  // Aguarda o modal de lançamento fechar antes de abrir o aviso
   setTimeout(()=>{
     document.getElementById('modal-dizimo-aviso').classList.add('show');
   },300);
 }
 function fecharAvisoDizimo(){
   document.getElementById('modal-dizimo-aviso').classList.remove('show');
-  mesAvisoDizimo='';
+  dizimoAvisoKey='';
 }
 function confirmarAvisoDizimo(){
-  if(mesAvisoDizimo){
-    cacheDizimo[mesAvisoDizimo]=true;
+  if(dizimoAvisoKey){
+    cacheDizimo[dizimoAvisoKey]=true;
     saveDizimo();
     renderDizimo();
-    toast('Dízimo marcado como recolhido! 🙏');
+    atualizarMetricasDizimo();
+    toast('Dízimo recolhido! 🙏');
   }
   fecharAvisoDizimo();
 }
@@ -1028,7 +1098,7 @@ async function confirmarLancamento(){
       cache.rendaFixa.unshift({...row,desc});
       fecharModal();renderAll();
       toast('Renda fixa cadastrada!');
-      mostrarAvisoDizimo(desc,valor,mes);
+      mostrarAvisoDizimo(desc,valor,'rf_'+row.id+'_'+mes);
     }catch(e){toast('Erro: '+e.message,true);}
     return;
   }
@@ -1042,7 +1112,7 @@ async function confirmarLancamento(){
       cache.rendas.unshift({...row,desc});
       fecharModal();renderAll();
       toast('Renda extra adicionada!');
-      mostrarAvisoDizimo(desc,valor,mes);
+      mostrarAvisoDizimo(desc,valor,'r_'+row.id);
     }catch(e){toast('Erro: '+e.message,true);}
     return;
   }
@@ -1126,12 +1196,17 @@ function prevQuit(p){
 // ===== RENDERS =====
 function renderAll(){
   document.getElementById('mes-titulo').textContent=mesStr(viewYear,viewMonth);
-  const renda=getRendaDoMes(viewYear,viewMonth),gastos=getGastosDoMes(viewYear,viewMonth),saldo=renda-gastos;
+  const renda=getRendaDoMes(viewYear,viewMonth),gastos=getGastosDoMes(viewYear,viewMonth);
+  // desconta dízimo pendente do saldo se ativo
+  const {totalDev:dizTotalDev}=dizimoAtivo()?getDizimoTotais(viewYear,viewMonth):{totalDev:0};
+  const saldo=renda-gastos-dizTotalDev;
   document.getElementById('m-renda').textContent=fmt(renda);
   document.getElementById('m-gastos').textContent=fmt(gastos);
-  const se=document.getElementById('m-saldo');se.textContent=fmt(saldo);se.style.color=saldo>=0?'#155724':'#721c24';
+  const se=document.getElementById('m-saldo');se.textContent=fmt(saldo);se.style.color=saldo>=0?'#1a7a3c':'#c0392b';
   populateSelects();
-  renderResumoCompleto();renderDizimo();renderLancamentos();renderRendas();renderContas();renderCategorias();renderHistorico();
+  renderDizimo();
+  atualizarMetricasDizimo();
+  renderResumoCompleto();renderLancamentos();renderRendas();renderContas();renderCategorias();renderHistorico();
   if(document.getElementById('tab-graficos').classList.contains('active'))renderGraficos();
   if(document.getElementById('tab-metas').classList.contains('active'))renderMetas();
   verificarMetas();
@@ -1144,11 +1219,20 @@ function renderResumoCompleto(){
   const key=ymKey(viewYear,viewMonth);
 
   // helper totalizador
-  function totalBar(valor,label,cor){
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:${cor};border-radius:8px;margin-bottom:10px">
-      <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">${label}</span>
-      <span style="font-size:16px;font-weight:700;color:var(--text)">${fmt(valor)}</span>
-    </div>`;
+  function totalBar(valor,label,tipo){
+    tipo=tipo||'neutro';
+    const isDark=document.body.classList.contains('dark');
+    let bgStyle,textColor,labelColor;
+    if(tipo==='parcela'){
+      bgStyle=`background:var(--metric-bg);border:1.5px solid #e07b00`;
+      textColor=isDark?'#ffb266':'#7a3f00';
+      labelColor=isDark?'#cc8844':'#a05500';
+    }else{
+      bgStyle=`background:var(--metric-bg);border:1px solid var(--border)`;
+      textColor='var(--text)';
+      labelColor='var(--text2)';
+    }
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;${bgStyle};border-radius:8px;margin-bottom:10px"><span style="font-size:12px;font-weight:600;color:${labelColor};text-transform:uppercase;letter-spacing:.4px">${label}</span><span style="font-size:16px;font-weight:700;color:${textColor}">${fmt(valor)}</span></div>`;
   }
 
   // ---- RENDA ----
@@ -1157,7 +1241,7 @@ function renderResumoCompleto(){
   let totalRenda=0;
   rfs.forEach(rf=>{totalRenda+=Number(rf.valor);htmlRenda+=`<div class="row-renda"><div><div class="desc">${rf.desc} <span class="badge badge-green">fixa</span></div><div class="sub">${rf.cat||'Renda'} · desde ${rf.inicio}${rf.fim&&rf.fim!==''?' até '+rf.fim:' · indeterminado'}</div></div><span class="val">${fmt(rf.valor)}/mês</span></div>`;});
   avulsas.forEach(r=>{totalRenda+=Number(r.valor);htmlRenda+=`<div class="row-renda"><div><div class="desc">${r.desc}</div><div class="sub">${r.cat||'Renda'} · extra</div></div><span class="val">${fmt(r.valor)}</span></div>`;});
-  if(htmlRenda&&(rfs.length+avulsas.length)>1) htmlRenda+=totalBar(totalRenda,'Total de rendas','var(--metric-bg)');
+  if(htmlRenda&&(rfs.length+avulsas.length)>1) htmlRenda+=totalBar(totalRenda,'Total de rendas','neutro');
   document.getElementById('res-rendafixa').innerHTML=htmlRenda||'<div class="empty">Nenhuma renda este mês</div>';
 
   // ---- CONTAS ----
@@ -1171,7 +1255,7 @@ function renderResumoCompleto(){
     const badge=c.pago?'<span class="badge badge-gray">paga</span>':diff<0?'<span class="badge badge-red">vencida</span>':diff<=5?`<span class="badge badge-yellow">vence em ${diff}d</span>`:'';
     return`<div class="${cls}"><div><div class="desc">${c.desc}</div><div class="sub">${dia}${c.recorr==='sim'?' · recorrente':''}</div></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${badge}<span class="val">${fmt(c.valor)}</span>${btnP}<button class="del-btn" onclick="delItem('contas','${c.id}')">×</button></div></div>`;
   }).join('');
-  if(contasMes.length>1) htmlContas+=totalBar(totalContas,'Total de contas','var(--metric-bg)');
+  if(contasMes.length>1) htmlContas+=totalBar(totalContas,'Total de contas','neutro');
   document.getElementById('res-contas').innerHTML=htmlContas||'<div class="empty">Nenhuma conta este mês</div>';
 
   // ---- PARCELAS ----
@@ -1187,7 +1271,7 @@ function renderResumoCompleto(){
     const vctoInfo=p.diavcto?` · vence dia ${p.diavcto}`:'';
     return`<div class="row-parcelado"><div style="flex:1;min-width:0"><div class="desc">${p.desc} ${tipoBadge}</div><div class="sub">${p.cat||'Outros'}${vctoInfo} · faltam ${prev.restantes} parcelas · quitação: ${prev.mes}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:12px"><span style="font-size:17px;font-weight:700;color:#7a3f00;line-height:1;letter-spacing:-0.5px">${d}<span style="font-size:13px;font-weight:500;color:#a05500">/${p.parcelas}x</span></span><span class="val" style="font-size:18px">${fmt(vp)}/mês</span></div></div>`;
   }).join('');
-  if(parc.length>0) htmlParc+=totalBar(totalParc, filtro?`Total parcelas · ${filtro}`:'Total de parcelas este mês','var(--metric-bg)')
+  if(parc.length>0) htmlParc+=totalBar(totalParc, filtro?`Total parcelas · ${filtro}`:'Total de parcelas este mês','parcela');
   document.getElementById('res-parcelas').innerHTML=htmlParc||`<div class="empty">Nenhuma parcela este mês${filtro?' em '+filtro:''}</div>`;
 
   // ---- GASTOS À VISTA ----
@@ -1197,7 +1281,7 @@ function renderResumoCompleto(){
     const tipoBadge=g.tipo?`<span class="badge ${TIPO_BADGE[g.tipo]||'badge-gray'}" style="font-size:10px">${TIPO_LABELS[g.tipo]||g.tipo}</span>`:'';
     return`<div class="row-item"><div><div style="font-size:14px;font-weight:500">${g.desc} ${tipoBadge}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${g.cat||'Outros'}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#721c24">${fmt(g.valor)}</span><button class="del-btn" onclick="delItem('gastos','${g.id}')">×</button></div></div>`;
   }).join('');
-  if(gv.length>0) htmlGv+=totalBar(totalGv, filtro?`Total à vista · ${filtro}`:'Total de gastos à vista','var(--metric-bg)');
+  if(gv.length>0) htmlGv+=totalBar(totalGv, filtro?`Total à vista · ${filtro}`:'Total de gastos à vista','neutro');
   document.getElementById('res-gastos').innerHTML=htmlGv||`<div class="empty">Nenhum gasto à vista${filtro?' em '+filtro:''}</div>`;
 }
 

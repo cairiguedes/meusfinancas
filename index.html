@@ -391,6 +391,33 @@ select option{background:var(--input-bg);color:var(--input-color)}
       <option value="renda">Renda</option>
     </select>
   </div>
+  <!-- Card de edição inline -->
+  <div id="edit-form-card" class="card" style="display:none;border-color:#3b82f6;background:var(--info-bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0;color:#1e40af">✏️ Editar lançamento</div>
+      <button class="del-btn" onclick="cancelarEdicao()" title="Cancelar edição" style="font-size:20px">×</button>
+    </div>
+    <div class="field-wrap">
+      <label class="field-label">Descrição</label>
+      <input type="text" id="edit-desc" placeholder="Descrição do lançamento"/>
+    </div>
+    <div class="form-grid">
+      <div class="field-wrap" style="margin-bottom:0">
+        <label class="field-label">Valor (R$)</label>
+        <input type="number" id="edit-valor" placeholder="0,00" min="0" step="0.01"/>
+      </div>
+      <div class="field-wrap" style="margin-bottom:0">
+        <label class="field-label">Categoria</label>
+        <select id="edit-cat"><option value="">Categoria</option></select>
+      </div>
+    </div>
+    <div class="field-wrap" style="margin-top:8px">
+      <label class="field-label">Mês (AAAA-MM)</label>
+      <input type="month" id="edit-data"/>
+    </div>
+    <button id="btn-salvar-edicao" class="add-btn" onclick="salvarEdicao()" style="margin-top:8px;background:#3b82f6;border-color:#3b82f6">Salvar Alterações</button>
+    <button class="sec-btn" onclick="cancelarEdicao()">Cancelar</button>
+  </div>
   <div class="card"><div id="lista-lancamentos"><div class="loading">Carregando...</div></div></div>
 </div>
 
@@ -538,6 +565,8 @@ let cacheDizimo = {};
 let viewYear, viewMonth;
 let tipoAtual = '', categoriaAtual = '', modoData = 'mes';
 let dizimoAvisoKey = '';
+let editIndex = null;
+let cacheLancamentos = [];
 
 // =====================================================================
 // SUPABASE — CRUD
@@ -1384,7 +1413,7 @@ function renderResumoCompleto() {
 
 function renderLancamentos() {
   const filtroTipo = el('filtro-tipo-lanc')?.value || '';
-  const all = [
+  cacheLancamentos = [
     ...cache.rendas.map(r    => ({ ...r, _tipo:'renda' })),
     ...cache.gastos.map(g    => ({ ...g, _tipo:'gasto' })),
     ...cache.parcelados.map(p=> ({ ...p, _tipo:'parcelado' }))
@@ -1392,22 +1421,24 @@ function renderLancamentos() {
   .filter(i => !filtroTipo || (filtroTipo==='renda' && i._tipo==='renda') || i.tipo===filtroTipo)
   .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''));
 
-  if (!all.length) { setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>'); return; }
+  if (!cacheLancamentos.length) { setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>'); return; }
 
-  setHtml('lista-lancamentos', all.slice(0,50).map(item => {
+  setHtml('lista-lancamentos', cacheLancamentos.slice(0,50).map((item, index) => {
+    const editBtn = `<button class="del-btn" onclick="prepararEdicao(${index})" title="Editar" style="font-size:17px">✏️</button>`;
     if (item._tipo === 'renda') {
-      return _htmlRowRenda(item.desc, `${item.mes} · ${item.cat||'Renda'}`, fmt(item.valor), _delBtn('rendas', item.id));
+      return _htmlRowRenda(item.desc, `${item.mes} · ${item.cat||'Renda'}`, fmt(item.valor),
+        editBtn + _delBtn('rendas', item.id));
     }
     if (item._tipo === 'gasto') {
       return `<div class="row-item">
         <div><div style="font-size:14px;font-weight:500">${item.desc} ${_tipoBadge(item.tipo)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${item.mes} · ${item.cat||'Outros'}</div></div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#721c24">${fmt(item.valor)}</span>${_delBtn('gastos',item.id)}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#721c24">${fmt(item.valor)}</span>${editBtn}${_delBtn('gastos',item.id)}</div>
       </div>`;
     }
     const vp = Number(item.total)/Number(item.parcelas);
     return `<div class="row-parcelado">
       <div><div class="desc">${item.desc} ${_tipoBadge(item.tipo)} <span class="badge badge-orange">${item.parcelas}x</span></div><div class="sub">${item.inicio} · ${item.cat||'Outros'}${item.diavcto?' · vence dia '+item.diavcto:''}</div></div>
-      <div style="display:flex;align-items:center;gap:6px"><span class="val">${fmt(vp)}/mês</span>${_delBtn('parcelados',item.id)}</div>
+      <div style="display:flex;align-items:center;gap:6px"><span class="val">${fmt(vp)}/mês</span>${editBtn}${_delBtn('parcelados',item.id)}</div>
     </div>`;
   }).join(''));
 }
@@ -1585,6 +1616,81 @@ function verificarMetas() {
   const over = Object.keys(cacheMetas).filter(cat => (gastosPorCat[cat]||0) > cacheMetas[cat]);
   if (over.length) toast(over.length===1 ? `⚠️ Meta de "${over[0]}" ultrapassada!` : `⚠️ ${over.length} metas ultrapassadas!`, true);
 }
+
+// =====================================================================
+// EDITAR LANÇAMENTO
+// =====================================================================
+function prepararEdicao(index) {
+  const item = cacheLancamentos[index];
+  if (!item) return;
+
+  // Scroll para o formulário da aba lançamentos
+  const formCard = document.querySelector('#tab-lancamentos .card');
+
+  // Preenche os campos do formulário de edição rápida na aba Lançamentos
+  el('edit-desc').value  = item.desc || '';
+  el('edit-valor').value = item.valor || item.total || '';
+  el('edit-cat').value   = item.cat || '';
+  el('edit-data').value  = item.mes || item.inicio || '';
+
+  // Atualiza o select de categoria com as opções certas
+  const tipo = item._tipo;
+  const catOpts = getCats(tipo === 'renda' ? 'renda' : 'gasto');
+  el('edit-cat').innerHTML = '<option value="">Categoria</option>' + catOpts.map(o => `<option${o===item.cat?' selected':''}>${o}</option>`).join('');
+
+  el('edit-form-card').style.display = 'block';
+  el('btn-salvar-edicao').textContent = 'Salvar Alterações';
+  editIndex = index;
+  el('edit-desc').focus();
+  formCard?.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function salvarEdicao() {
+  if (editIndex === null) return;
+  const item = cacheLancamentos[editIndex];
+  if (!item) return;
+
+  const desc  = el('edit-desc').value.trim();
+  const valor = parseFloat(el('edit-valor').value);
+  const cat   = el('edit-cat').value;
+  const data  = el('edit-data').value;
+
+  if (!desc)           return alert('Digite uma descrição.');
+  if (!valor||valor<=0) return alert('Digite um valor válido.');
+  if (!data)           return alert('Informe o mês/data.');
+
+  const tableMap = { renda:'rendas', gasto:'gastos', parcelado:'parcelados' };
+  const table    = tableMap[item._tipo];
+  const campo    = item._tipo === 'parcelado' ? { descricao:desc, total:valor, cat, inicio:data } : { descricao:desc, valor, cat, mes:data };
+
+  try {
+    await dbUpdate(table, item.id, campo);
+    // Atualiza o cache local
+    if (item._tipo === 'renda') {
+      const idx = cache.rendas.findIndex(r => r.id === item.id);
+      if (idx > -1) cache.rendas[idx] = { ...cache.rendas[idx], descricao:desc, desc, valor, cat, mes:data };
+    } else if (item._tipo === 'gasto') {
+      const idx = cache.gastos.findIndex(g => g.id === item.id);
+      if (idx > -1) cache.gastos[idx] = { ...cache.gastos[idx], descricao:desc, desc, valor, cat, mes:data };
+    } else {
+      const idx = cache.parcelados.findIndex(p => p.id === item.id);
+      if (idx > -1) cache.parcelados[idx] = { ...cache.parcelados[idx], descricao:desc, desc, total:valor, cat, inicio:data };
+    }
+    cancelarEdicao();
+    renderAll();
+    toast('Lançamento atualizado! ✅');
+  } catch(e) { toast('Erro: '+e.message, true); }
+}
+
+function cancelarEdicao() {
+  editIndex = null;
+  el('edit-form-card').style.display = 'none';
+  el('edit-desc').value  = '';
+  el('edit-valor').value = '';
+  el('edit-cat').value   = '';
+  el('edit-data').value  = '';
+}
+
 
 // =====================================================================
 // AÇÕES — CRUD

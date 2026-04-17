@@ -51,6 +51,9 @@ select option{background:var(--input-bg);color:var(--input-color)}
 .action-btn:hover{background:var(--metric-bg)}
 .del-btn{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:0 2px;line-height:1}
 .del-btn:hover{color:#c00}
+.list-action-btn{width:32px;height:32px;background:transparent;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;transition:background .15s;color:var(--text);padding:0;flex-shrink:0}
+.list-action-btn:hover{background:var(--metric-bg)}
+.list-action-btn.del:hover{border-color:#c00;color:#c00}
 .nav-month{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
 .nav-btn{background:var(--nav-btn-bg);border:1.5px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:20px;color:var(--text);display:flex;align-items:center;justify-content:center}
 .nav-btn:hover{background:var(--metric-bg)}
@@ -140,6 +143,21 @@ select option{background:var(--input-bg);color:var(--input-color)}
 .pie-legend{display:flex;flex-direction:column;gap:7px;flex:1;min-width:120px}
 .pie-leg-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--leg-color)}
 .pie-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+/* Fix botão excluir: garante cor visível em ambos os temas */
+.list-action-btn.del{color:#999;border-color:var(--border)}
+.list-action-btn.del:hover{border-color:#c00 !important;color:#c00 !important;background:rgba(204,0,0,.08) !important}
+/* Marcar como pago — lançamentos */
+.item-pago{background:rgba(0,123,255,.08);border-radius:8px;border-left:3px solid #3b82f6;padding-left:10px;margin-bottom:4px}
+body.dark .item-pago{background:rgba(59,130,246,.15);border-left-color:#60a5fa}
+.item-pago .lanc-desc{text-decoration:line-through;opacity:.7}
+/* Dark mode contrast — gastos à vista (aba Resumo) */
+body.dark .gasto-av-desc{color:#f0f0f0 !important}
+body.dark .gasto-av-sub{color:#bbb !important}
+body.dark .gasto-av-val{color:#ffaaaa !important}
+/* Dark mode contrast — aba Lançamentos gastos */
+body.dark .lanc-gasto-desc{color:#f0f0f0 !important}
+body.dark .lanc-gasto-sub{color:#bbb !important}
+body.dark .lanc-gasto-val{color:#ffaaaa !important}
 @media(max-width:480px){
   .form-grid{grid-template-columns:1fr}
   .form-grid.three{grid-template-columns:1fr}
@@ -348,9 +366,15 @@ select option{background:var(--input-bg);color:var(--input-color)}
   <div class="metrics">
     <div class="metric"><div class="metric-label">Renda do mês</div><div class="metric-value" id="m-renda" style="color:#155724">R$ 0</div></div>
     <div class="metric"><div class="metric-label">Total de gastos</div><div class="metric-value" id="m-gastos" style="color:#721c24">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">Saldo</div><div class="metric-value" id="m-saldo">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">Saldo atual</div><div class="metric-value" id="m-saldo">R$ 0</div></div>
     <div class="metric" id="m-dizimo-wrap" style="display:none"><div class="metric-label">Dízimo pendente</div><div class="metric-value" id="m-dizimo" style="color:#7c3aed">R$ 0</div></div>
     <div class="metric" id="m-liquido-wrap" style="display:none"><div class="metric-label">Líquido</div><div class="metric-value" id="m-liquido">R$ 0</div></div>
+  </div>
+  <!-- Métricas de pagos/pendentes -->
+  <div class="metrics" id="m-pago-wrap" style="display:none">
+    <div class="metric"><div class="metric-label">💚 Gastos pagos</div><div class="metric-value" id="m-gastos-pagos" style="color:#1e40af">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">🟠 Gastos pendentes</div><div class="metric-value" id="m-gastos-pendentes" style="color:#e07b00">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">Saldo projetado</div><div class="metric-value" id="m-saldo-projetado">R$ 0</div></div>
   </div>
   <div class="legenda">
     <div class="leg-item"><div class="leg-dot" style="background:#d4edda;border-color:#28a745"></div>Renda</div>
@@ -358,6 +382,7 @@ select option{background:var(--input-bg);color:var(--input-color)}
     <div class="leg-item"><div class="leg-dot" style="background:#f8d7da;border-color:#dc3545"></div>Vencida</div>
     <div class="leg-item"><div class="leg-dot" style="background:#ffe5cc;border-color:#e07b00"></div>Parcelado</div>
     <div class="leg-item"><div class="leg-dot" style="background:#dbeafe;border-color:#3b82f6"></div>Pago</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#e8e8e8;border-color:#888"></div>Pendente</div>
   </div>
   <div class="filtro-wrap">
     <span class="filtro-label">Filtrar:</span>
@@ -423,6 +448,39 @@ select option{background:var(--input-bg);color:var(--input-color)}
 
 <!-- ABA RENDAS -->
 <div id="tab-rendas" class="tab">
+  <!-- Card edição renda fixa -->
+  <div id="edit-rf-card" class="card" style="display:none;border-color:#3b82f6;background:var(--info-bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0;color:#1e40af">✏️ Editar renda fixa</div>
+      <button class="list-action-btn del" onclick="cancelarEdicaoRendaFixa()" title="Cancelar">×</button>
+    </div>
+    <div class="field-wrap"><label class="field-label">Descrição</label><input type="text" id="edit-rf-desc"/></div>
+    <div class="form-grid">
+      <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Valor (R$)</label><input type="number" id="edit-rf-valor" min="0" step="0.01"/></div>
+      <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Categoria</label><select id="edit-rf-cat"></select></div>
+    </div>
+    <div class="form-grid" style="margin-top:8px">
+      <div><label class="field-label">Mês Início</label><input type="month" id="edit-rf-inicio"/></div>
+      <div><label class="field-label">Mês Fim <span style="font-weight:400;color:var(--text3)">(opcional)</span></label><input type="month" id="edit-rf-fim"/></div>
+    </div>
+    <button class="add-btn" onclick="salvarEdicaoRendaFixa()" style="margin-top:8px;background:#3b82f6;border-color:#3b82f6">Salvar Alterações</button>
+    <button class="sec-btn" onclick="cancelarEdicaoRendaFixa()">Cancelar</button>
+  </div>
+  <!-- Card edição renda extra -->
+  <div id="edit-re-card" class="card" style="display:none;border-color:#3b82f6;background:var(--info-bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0;color:#1e40af">✏️ Editar renda extra</div>
+      <button class="list-action-btn del" onclick="cancelarEdicaoRendaExtra()" title="Cancelar">×</button>
+    </div>
+    <div class="field-wrap"><label class="field-label">Descrição</label><input type="text" id="edit-re-desc"/></div>
+    <div class="form-grid">
+      <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Valor (R$)</label><input type="number" id="edit-re-valor" min="0" step="0.01"/></div>
+      <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Categoria</label><select id="edit-re-cat"></select></div>
+    </div>
+    <div class="field-wrap" style="margin-top:8px"><label class="field-label">Mês</label><input type="month" id="edit-re-mes"/></div>
+    <button class="add-btn" onclick="salvarEdicaoRendaExtra()" style="margin-top:8px;background:#3b82f6;border-color:#3b82f6">Salvar Alterações</button>
+    <button class="sec-btn" onclick="cancelarEdicaoRendaExtra()">Cancelar</button>
+  </div>
   <div class="card">
     <div class="section-title">Rendas fixas cadastradas</div>
     <div id="lista-rendafixa"><div class="loading">Carregando...</div></div>
@@ -443,12 +501,58 @@ select option{background:var(--input-bg);color:var(--input-color)}
     </div>
     <div class="form-grid">
       <input type="date" id="c-venc"/>
-      <select id="c-recorr">
+      <select id="c-recorr" onchange="togglePeriodoContas()">
         <option value="nao">Pagamento único</option>
         <option value="sim">Recorrente (mensal)</option>
+        <option value="periodo">Pagamento por Período</option>
       </select>
     </div>
+    <div id="c-periodo-wrap" style="display:none">
+      <div class="form-grid" style="margin-top:8px">
+        <div>
+          <label class="field-label">Mês Início</label>
+          <input type="month" id="c-periodo-inicio"/>
+        </div>
+        <div>
+          <label class="field-label">Mês Fim</label>
+          <input type="month" id="c-periodo-fim"/>
+        </div>
+      </div>
+      <div class="hint">Serão geradas entradas para cada mês do período</div>
+    </div>
     <button class="add-btn" onclick="addConta()">+ Adicionar conta</button>
+  </div>
+  <!-- Card de edição de conta -->
+  <div id="edit-conta-card" class="card" style="display:none;border-color:#3b82f6;background:var(--info-bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0;color:#1e40af">✏️ Editar conta</div>
+      <button class="list-action-btn del" onclick="cancelarEdicaoConta()" title="Cancelar">×</button>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label class="field-label">Descrição</label>
+        <input type="text" id="edit-c-desc" placeholder="Descrição"/>
+      </div>
+      <div>
+        <label class="field-label">Valor (R$)</label>
+        <input type="number" id="edit-c-valor" placeholder="0,00" min="0" step="0.01"/>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-top:8px">
+      <div>
+        <label class="field-label">Vencimento</label>
+        <input type="date" id="edit-c-venc"/>
+      </div>
+      <div>
+        <label class="field-label">Recorrência</label>
+        <select id="edit-c-recorr">
+          <option value="nao">Pagamento único</option>
+          <option value="sim">Recorrente (mensal)</option>
+        </select>
+      </div>
+    </div>
+    <button class="add-btn" onclick="salvarEdicaoConta()" style="margin-top:8px;background:#3b82f6;border-color:#3b82f6">Salvar Alterações</button>
+    <button class="sec-btn" onclick="cancelarEdicaoConta()">Cancelar</button>
   </div>
   <div class="card"><div class="section-title">Todas as contas</div><div id="lista-contas"><div class="loading">Carregando...</div></div></div>
 </div>
@@ -688,6 +792,7 @@ function mostrarApp() {
   document.getElementById('user-email').textContent = currentUser?.email || '';
   loadMetas();
   loadDizimo();
+  loadPagoGastos();
   renderConfDizimo();
   loadAll();
 }
@@ -789,6 +894,44 @@ function getGastosDoMes(y, m) {
     }
   });
   return total;
+}
+
+function getGastosPagosPendentes(y, m) {
+  // Lê o mapa de pagos do localStorage
+  const pagoMap = _loadPagoMap();
+  const key = ymKey(y, m);
+  let pagos = 0, pendentes = 0;
+
+  // Gastos à vista do mês
+  cache.gastos.filter(g => g.mes === key).forEach(g => {
+    const k = 'gasto_' + g.id;
+    if (pagoMap[k]) pagos += Number(g.valor);
+    else pendentes += Number(g.valor);
+  });
+
+  // Parcelas ativas do mês
+  cache.parcelados.forEach(p => {
+    const s = ymToObj(p.inicio);
+    const d = (y*12+m) - (s.y*12+s.m);
+    if (d >= 0 && d < p.parcelas) {
+      const vp = Number(p.total) / Number(p.parcelas);
+      const k  = 'parcelado_' + p.id;
+      if (pagoMap[k]) pagos += vp;
+      else pendentes += vp;
+    }
+  });
+
+  // Contas do mês (consideram-se pendentes se não pagas)
+  cache.contas.forEach(c => {
+    const vd = new Date(c.venc+'T12:00:00');
+    const noMes = c.recorr === 'sim'
+      || (vd.getFullYear() === y && vd.getMonth() === m);
+    if (!noMes) return;
+    if (c.pago) pagos += Number(c.valor);
+    else pendentes += Number(c.valor);
+  });
+
+  return { pagos, pendentes };
 }
 
 function getGastosPorCat(y, m) {
@@ -1267,7 +1410,12 @@ function _tipoBadge(tipo) {
 
 /** Botão deletar padrão */
 function _delBtn(cacheKey, id) {
-  return `<button class="del-btn" onclick="delItem('${cacheKey}','${id}')">×</button>`;
+  return `<button class="list-action-btn del" onclick="delItem('${cacheKey}','${id}')" title="Excluir">×</button>`;
+}
+
+/** Botão editar padrão */
+function _editBtn(onclick) {
+  return `<button class="list-action-btn" onclick="${onclick}" title="Editar">✏️</button>`;
 }
 
 /** Row de renda */
@@ -1282,11 +1430,11 @@ function _htmlRowRenda(desc, sub, val, extraHtml='') {
 function _htmlRowGasto(g) {
   return `<div class="row-item">
     <div>
-      <div style="font-size:14px;font-weight:500">${g.desc} ${_tipoBadge(g.tipo)}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">${g.cat||'Outros'}</div>
+      <div class="gasto-av-desc" style="font-size:14px;font-weight:500">${g.desc} ${_tipoBadge(g.tipo)}</div>
+      <div class="gasto-av-sub" style="font-size:12px;color:var(--text2);margin-top:2px">${g.cat||'Outros'}</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
-      <span style="font-weight:600;color:#721c24">${fmt(g.valor)}</span>
+      <span class="gasto-av-val" style="font-weight:600;color:#721c24">${fmt(g.valor)}</span>
       ${_delBtn('gastos', g.id)}
     </div>
   </div>`;
@@ -1327,7 +1475,7 @@ function _htmlRowConta(c) {
     : `<button class="action-btn" onclick="togglePago('${c.id}')">Marcar paga</button>`;
   return `<div class="${cls}">
     <div><div class="desc">${c.desc}</div><div class="sub">${dia}${c.recorr==='sim'?' · recorrente':''}</div></div>
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${badge}<span class="val">${fmt(c.valor)}</span>${btnPagar}${_delBtn('contas',c.id)}</div>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">${badge}<span class="val">${fmt(c.valor)}</span>${btnPagar}${_editBtn(`prepararEdicaoConta('${c.id}')`)}${_delBtn('contas',c.id)}</div>
   </div>`;
 }
 
@@ -1339,9 +1487,36 @@ function renderAll() {
   const renda  = getRendaDoMes(viewYear, viewMonth);
   const gastos = getGastosDoMes(viewYear, viewMonth);
   const saldo  = renda - gastos;
-  el('m-renda').textContent = fmt(renda);
-  el('m-gastos').textContent= fmt(gastos);
-  const ms = el('m-saldo'); ms.textContent = fmt(saldo); ms.style.color = saldo >= 0 ? '#155724' : '#721c24';
+
+  // Métricas principais
+  el('m-renda').textContent  = fmt(renda);
+  el('m-gastos').textContent = fmt(gastos);
+  const ms = el('m-saldo');
+  ms.textContent = fmt(saldo);
+  ms.style.color = saldo >= 0 ? '#155724' : '#721c24';
+  // Renomear label saldo para "Saldo atual"
+  const msLabel = ms.previousElementSibling;
+  if (msLabel) msLabel.textContent = 'Saldo atual';
+
+  // Métricas pagos / pendentes
+  const { pagos, pendentes } = getGastosPagosPendentes(viewYear, viewMonth);
+  const temDados = pagos > 0 || pendentes > 0;
+  const wrapPago = el('m-pago-wrap');
+  if (wrapPago) wrapPago.style.display = temDados ? '' : 'none';
+  if (temDados) {
+    // Gastos pagos — azul (mode safe)
+    const dark = isDark();
+    const mGP = el('m-gastos-pagos');
+    if (mGP) { mGP.textContent = fmt(pagos); mGP.style.color = dark ? '#93c5fd' : '#1e40af'; }
+    // Gastos pendentes — laranja
+    const mGPend = el('m-gastos-pendentes');
+    if (mGPend) { mGPend.textContent = fmt(pendentes); mGPend.style.color = dark ? '#fb923c' : '#e07b00'; }
+    // Saldo projetado = renda − (pagos + pendentes)
+    const projetado = renda - (pagos + pendentes);
+    const mSP = el('m-saldo-projetado');
+    if (mSP) { mSP.textContent = fmt(projetado); mSP.style.color = projetado >= 0 ? '#155724' : '#721c24'; }
+  }
+
   populateSelects();
   renderResumoCompleto();
   renderDizimo();
@@ -1413,32 +1588,84 @@ function renderResumoCompleto() {
 
 function renderLancamentos() {
   const filtroTipo = el('filtro-tipo-lanc')?.value || '';
+
+  // Monta cacheLancamentos preservando o flag .pago salvo
+  const pagoMap = _loadPagoMap();
   cacheLancamentos = [
-    ...cache.rendas.map(r    => ({ ...r, _tipo:'renda' })),
-    ...cache.gastos.map(g    => ({ ...g, _tipo:'gasto' })),
-    ...cache.parcelados.map(p=> ({ ...p, _tipo:'parcelado' }))
+    ...cache.rendas.map(r     => ({ ...r, _tipo:'renda'     })),
+    ...cache.gastos.map(g     => ({ ...g, _tipo:'gasto'     })),
+    ...cache.parcelados.map(p => ({ ...p, _tipo:'parcelado' }))
   ]
   .filter(i => !filtroTipo || (filtroTipo==='renda' && i._tipo==='renda') || i.tipo===filtroTipo)
-  .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''));
+  .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''))
+  .map(i => ({ ...i, pago: !!(pagoMap[i._tipo + '_' + i.id]) }));
 
-  if (!cacheLancamentos.length) { setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>'); return; }
+  if (!cacheLancamentos.length) {
+    setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>');
+    return;
+  }
 
   setHtml('lista-lancamentos', cacheLancamentos.slice(0,50).map((item, index) => {
-    const editBtn = `<button class="del-btn" onclick="prepararEdicao(${index})" title="Editar" style="font-size:17px">✏️</button>`;
+    const isPago   = item.pago === true;
+    const checkBtn = isPago
+      ? `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Desmarcar pago" style="border-color:#3b82f6;color:#1e40af;background:#dbeafe;flex-shrink:0">✅</button>`
+      : `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Marcar como pago" style="color:var(--text2);flex-shrink:0">☐</button>`;
+    const editBtn  = _editBtn(`prepararEdicao(${index})`);
+    const itemCls  = isPago ? 'item-pago' : '';
+
+    // — RENDA —
     if (item._tipo === 'renda') {
-      return _htmlRowRenda(item.desc, `${item.mes} · ${item.cat||'Renda'}`, fmt(item.valor),
-        editBtn + _delBtn('rendas', item.id));
-    }
-    if (item._tipo === 'gasto') {
-      return `<div class="row-item">
-        <div><div style="font-size:14px;font-weight:500">${item.desc} ${_tipoBadge(item.tipo)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${item.mes} · ${item.cat||'Outros'}</div></div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#721c24">${fmt(item.valor)}</span>${editBtn}${_delBtn('gastos',item.id)}</div>
+      return `<div class="row-renda ${itemCls}" style="margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          ${checkBtn}
+          <div>
+            <div class="desc lanc-desc">${item.desc} <span class="badge badge-green" style="font-size:10px">renda</span></div>
+            <div class="sub">${item.mes} · ${item.cat||'Renda'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:8px">
+          <span class="val">${fmt(item.valor)}</span>
+          ${editBtn}${_delBtn('rendas', item.id)}
+        </div>
       </div>`;
     }
-    const vp = Number(item.total)/Number(item.parcelas);
-    return `<div class="row-parcelado">
-      <div><div class="desc">${item.desc} ${_tipoBadge(item.tipo)} <span class="badge badge-orange">${item.parcelas}x</span></div><div class="sub">${item.inicio} · ${item.cat||'Outros'}${item.diavcto?' · vence dia '+item.diavcto:''}</div></div>
-      <div style="display:flex;align-items:center;gap:6px"><span class="val">${fmt(vp)}/mês</span>${editBtn}${_delBtn('parcelados',item.id)}</div>
+
+    // — GASTO À VISTA —
+    if (item._tipo === 'gasto') {
+      const valColor = isPago ? '#3b82f6' : '#721c24';
+      const valCls   = isPago ? '' : 'lanc-gasto-val';
+      const descCls  = isPago ? '' : 'lanc-gasto-desc';
+      const subCls   = isPago ? '' : 'lanc-gasto-sub';
+      return `<div class="row-item ${itemCls}" style="padding:10px 4px 10px 0">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          ${checkBtn}
+          <div>
+            <div class="${descCls} lanc-desc" style="font-size:14px;font-weight:500">${item.desc} ${_tipoBadge(item.tipo)}</div>
+            <div class="${subCls}" style="font-size:12px;color:var(--text2);margin-top:2px">${item.mes} · ${item.cat||'Outros'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:8px">
+          <span class="${valCls}" style="font-weight:600;color:${valColor}">${fmt(item.valor)}</span>
+          ${editBtn}${_delBtn('gastos', item.id)}
+        </div>
+      </div>`;
+    }
+
+    // — PARCELADO —
+    const vp = Number(item.total) / Number(item.parcelas);
+    const valCls = isPago ? '' : '';
+    return `<div class="row-parcelado ${itemCls}" style="margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+        ${checkBtn}
+        <div>
+          <div class="desc lanc-desc">${item.desc} ${_tipoBadge(item.tipo)} <span class="badge badge-orange">${item.parcelas}x</span></div>
+          <div class="sub">${item.inicio} · ${item.cat||'Outros'}${item.diavcto?' · vence dia '+item.diavcto:''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-left:8px">
+        <span class="val">${fmt(vp)}/mês</span>
+        ${editBtn}${_delBtn('parcelados', item.id)}
+      </div>
     </div>`;
   }).join(''));
 }
@@ -1447,11 +1674,11 @@ function renderRendas() {
   const rfe = el('lista-rendafixa');
   if (rfe) {
     setHtml('lista-rendafixa', cache.rendaFixa.length
-      ? cache.rendaFixa.map(rf => _htmlRowRenda(
+      ? cache.rendaFixa.map((rf, idx) => _htmlRowRenda(
           `${rf.desc} <span class="badge badge-green">fixa</span>`,
           `Desde ${rf.inicio}${rf.fim&&rf.fim!==''?' até '+rf.fim:' · indeterminado'} · ${rf.cat||'Renda'}`,
           `${fmt(rf.valor)}/mês`,
-          _delBtn('rendaFixa', rf.id)
+          _editBtn(`prepararEdicaoRendaFixa('${rf.id}')`) + _delBtn('rendaFixa', rf.id)
         )).join('')
       : '<div class="empty">Nenhuma renda fixa cadastrada<br><span style="font-size:12px">Use + Novo lançamento → Rendas → Renda fixa</span></div>'
     );
@@ -1462,7 +1689,7 @@ function renderRendas() {
         `${r.desc} <span class="badge badge-green">⭐ extra</span>`,
         `${r.mes} · ${r.cat||'Renda'}`,
         fmt(r.valor),
-        _delBtn('rendas', r.id)
+        _editBtn(`prepararEdicaoRendaExtra('${r.id}')`) + _delBtn('rendas', r.id)
       )).join('')
     : '<div class="empty">Nenhuma renda extra lançada<br><span style="font-size:12px">Use + Novo lançamento → Rendas → Renda extra</span></div>'
   );
@@ -1691,6 +1918,169 @@ function cancelarEdicao() {
   el('edit-data').value  = '';
 }
 
+// =====================================================================
+// MARCAR COMO PAGO — LANÇAMENTOS
+// =====================================================================
+function _pagoKey() { return 'mf_pago_lanc_' + (currentUser?.id || 'x'); }
+
+function _loadPagoMap() {
+  try { const r = localStorage.getItem(_pagoKey()); return r ? JSON.parse(r) : {}; }
+  catch { return {}; }
+}
+
+function _savePagoMap(map) {
+  localStorage.setItem(_pagoKey(), JSON.stringify(map));
+}
+
+// Compatibilidade — carregado em mostrarApp mas não bloqueia nada
+function loadPagoGastos() { /* substituído por _loadPagoMap() inline */ }
+
+function togglePagoLancamento(index) {
+  const item = cacheLancamentos[index];
+  if (!item) return;
+  const map  = _loadPagoMap();
+  const key  = item._tipo + '_' + item.id;
+  if (map[key]) { delete map[key]; item.pago = false; }
+  else           { map[key] = true;  item.pago = true;  }
+  _savePagoMap(map);
+  // Atualiza lista de lançamentos E métricas do resumo
+  renderLancamentos();
+  // Recalcula métricas pagos/pendentes sem recarregar tudo
+  const { pagos, pendentes } = getGastosPagosPendentes(viewYear, viewMonth);
+  const renda = getRendaDoMes(viewYear, viewMonth);
+  const temDados = pagos > 0 || pendentes > 0;
+  const wrapPago = el('m-pago-wrap');
+  if (wrapPago) wrapPago.style.display = temDados ? '' : 'none';
+  if (temDados) {
+    const dark = isDark();
+    const mGP = el('m-gastos-pagos');
+    if (mGP) { mGP.textContent = fmt(pagos); mGP.style.color = dark ? '#93c5fd' : '#1e40af'; }
+    const mGPend = el('m-gastos-pendentes');
+    if (mGPend) { mGPend.textContent = fmt(pendentes); mGPend.style.color = dark ? '#fb923c' : '#e07b00'; }
+    const projetado = renda - (pagos + pendentes);
+    const mSP = el('m-saldo-projetado');
+    if (mSP) { mSP.textContent = fmt(projetado); mSP.style.color = projetado >= 0 ? '#155724' : '#721c24'; }
+  }
+  toast(item.pago ? '✅ Marcado como pago!' : 'Pagamento desmarcado.');
+}
+
+// Alias legado (caso algum trecho antigo ainda chame)
+function togglePagoGasto(id) {
+  const idx = cacheLancamentos.findIndex(i => i.id === id && i._tipo === 'gasto');
+  if (idx > -1) togglePagoLancamento(idx);
+}
+
+// =====================================================================
+// CONTAS — PAGAMENTO POR PERÍODO
+// =====================================================================
+function togglePeriodoContas() {
+  const val = el('c-recorr').value;
+  el('c-periodo-wrap').style.display = val === 'periodo' ? 'block' : 'none';
+}
+
+// =====================================================================
+// EDITAR RENDA FIXA
+// =====================================================================
+let editRFId = null;
+function prepararEdicaoRendaFixa(id) {
+  const rf = cache.rendaFixa.find(r => r.id===id); if (!rf) return;
+  editRFId = id;
+  el('edit-rf-desc').value   = rf.desc || '';
+  el('edit-rf-valor').value  = rf.valor || '';
+  el('edit-rf-inicio').value = rf.inicio || '';
+  el('edit-rf-fim').value    = rf.fim || '';
+  const catOpts = getCats('renda');
+  el('edit-rf-cat').innerHTML = '<option value="">Categoria</option>' + catOpts.map(o => `<option${o===rf.cat?' selected':''}>${o}</option>`).join('');
+  el('edit-rf-card').style.display = 'block';
+  el('edit-rf-card').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+async function salvarEdicaoRendaFixa() {
+  if (!editRFId) return;
+  const desc  = el('edit-rf-desc').value.trim();
+  const valor = parseFloat(el('edit-rf-valor').value);
+  const cat   = el('edit-rf-cat').value;
+  const inicio= el('edit-rf-inicio').value;
+  const fim   = el('edit-rf-fim').value;
+  if (!desc||!valor||!inicio) return alert('Preencha descrição, valor e mês de início.');
+  try {
+    await dbUpdate('renda_fixa', editRFId, { descricao:desc, valor, cat, inicio, fim:fim||'' });
+    const idx = cache.rendaFixa.findIndex(r => r.id===editRFId);
+    if (idx>-1) cache.rendaFixa[idx] = { ...cache.rendaFixa[idx], descricao:desc, desc, valor, cat, inicio, fim:fim||'' };
+    cancelarEdicaoRendaFixa(); renderAll(); toast('Renda fixa atualizada! ✅');
+  } catch(e) { toast('Erro: '+e.message, true); }
+}
+function cancelarEdicaoRendaFixa() {
+  editRFId = null;
+  el('edit-rf-card').style.display = 'none';
+}
+
+// =====================================================================
+// EDITAR RENDA EXTRA
+// =====================================================================
+let editREId = null;
+function prepararEdicaoRendaExtra(id) {
+  const r = cache.rendas.find(r => r.id===id); if (!r) return;
+  editREId = id;
+  el('edit-re-desc').value  = r.desc || '';
+  el('edit-re-valor').value = r.valor || '';
+  el('edit-re-mes').value   = r.mes || '';
+  const catOpts = getCats('renda');
+  el('edit-re-cat').innerHTML = '<option value="">Categoria</option>' + catOpts.map(o => `<option${o===r.cat?' selected':''}>${o}</option>`).join('');
+  el('edit-re-card').style.display = 'block';
+  el('edit-re-card').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+async function salvarEdicaoRendaExtra() {
+  if (!editREId) return;
+  const desc  = el('edit-re-desc').value.trim();
+  const valor = parseFloat(el('edit-re-valor').value);
+  const cat   = el('edit-re-cat').value;
+  const mes   = el('edit-re-mes').value;
+  if (!desc||!valor||!mes) return alert('Preencha todos os campos.');
+  try {
+    await dbUpdate('rendas', editREId, { descricao:desc, valor, cat, mes });
+    const idx = cache.rendas.findIndex(r => r.id===editREId);
+    if (idx>-1) cache.rendas[idx] = { ...cache.rendas[idx], descricao:desc, desc, valor, cat, mes };
+    cancelarEdicaoRendaExtra(); renderAll(); toast('Renda extra atualizada! ✅');
+  } catch(e) { toast('Erro: '+e.message, true); }
+}
+function cancelarEdicaoRendaExtra() {
+  editREId = null;
+  el('edit-re-card').style.display = 'none';
+}
+
+// =====================================================================
+// EDITAR CONTA
+// =====================================================================
+let editContaId = null;
+function prepararEdicaoConta(id) {
+  const c = cache.contas.find(c => c.id===id); if (!c) return;
+  editContaId = id;
+  el('edit-c-desc').value   = c.desc || '';
+  el('edit-c-valor').value  = c.valor || '';
+  el('edit-c-venc').value   = c.venc || '';
+  el('edit-c-recorr').value = c.recorr || 'nao';
+  el('edit-conta-card').style.display = 'block';
+  el('edit-conta-card').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+async function salvarEdicaoConta() {
+  if (!editContaId) return;
+  const desc  = el('edit-c-desc').value.trim();
+  const valor = parseFloat(el('edit-c-valor').value);
+  const venc  = el('edit-c-venc').value;
+  const recorr= el('edit-c-recorr').value;
+  if (!desc||!valor||!venc) return alert('Preencha todos os campos.');
+  try {
+    await dbUpdate('contas', editContaId, { descricao:desc, valor, venc, recorr });
+    const idx = cache.contas.findIndex(c => c.id===editContaId);
+    if (idx>-1) cache.contas[idx] = { ...cache.contas[idx], descricao:desc, desc, valor, venc, recorr };
+    cancelarEdicaoConta(); renderAll(); verificarNotificacoes(); toast('Conta atualizada! ✅');
+  } catch(e) { toast('Erro: '+e.message, true); }
+}
+function cancelarEdicaoConta() {
+  editContaId = null;
+  el('edit-conta-card').style.display = 'none';
+}
+
 
 // =====================================================================
 // AÇÕES — CRUD
@@ -1700,7 +2090,37 @@ async function addConta() {
   const valor = el('c-valor').value;
   const venc  = el('c-venc').value;
   const recorr= el('c-recorr').value;
-  if (!desc||!valor||!venc) return alert('Preencha todos os campos.');
+  if (!desc||!valor) return alert('Preencha descrição e valor.');
+
+  if (recorr === 'periodo') {
+    const inicio = el('c-periodo-inicio').value;
+    const fim    = el('c-periodo-fim').value;
+    if (!inicio||!fim) return alert('Selecione o mês de início e fim do período.');
+    const [iy,im] = inicio.split('-').map(Number);
+    const [fy,fm] = fim.split('-').map(Number);
+    if (iy*12+im > fy*12+fm) return alert('O mês de início deve ser anterior ao mês fim.');
+    const rows = [];
+    let cy=iy, cm=im;
+    while (cy*12+cm <= fy*12+fm) {
+      const vencDia = venc || `${cy}-${String(cm).padStart(2,'0')}-01`;
+      const row = { id:uid(), descricao:desc, valor:parseFloat(valor), venc:vencDia, recorr:'nao', pago:false, user_id:currentUser.id };
+      rows.push(row);
+      cm++; if (cm>12) { cm=1; cy++; }
+    }
+    try {
+      for (const row of rows) {
+        await dbInsert('contas', row);
+        cache.contas.unshift({...row, desc});
+      }
+      el('c-desc').value=''; el('c-valor').value=''; el('c-periodo-inicio').value=''; el('c-periodo-fim').value='';
+      el('c-recorr').value='nao'; togglePeriodoContas();
+      renderAll(); verificarNotificacoes();
+      toast(`${rows.length} contas adicionadas por período! ✅`);
+    } catch(e) { toast('Erro: '+e.message, true); }
+    return;
+  }
+
+  if (!venc) return alert('Informe a data de vencimento.');
   const row = { id:uid(), descricao:desc, valor:parseFloat(valor), venc, recorr, pago:false, user_id:currentUser.id };
   try { await dbInsert('contas', row); cache.contas.unshift({...row, desc}); el('c-desc').value=''; el('c-valor').value=''; renderAll(); verificarNotificacoes(); toast('Conta adicionada!'); }
   catch(e) { toast('Erro: '+e.message, true); }

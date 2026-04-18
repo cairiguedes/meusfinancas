@@ -902,20 +902,20 @@ function getGastosPagosPendentes(y, m) {
   const key = ymKey(y, m);
   let pagos = 0, pendentes = 0;
 
-  // Gastos à vista do mês
+  // Gastos à vista do mês — chave inclui o próprio mês do gasto
   cache.gastos.filter(g => g.mes === key).forEach(g => {
-    const k = 'gasto_' + g.id;
+    const k = 'gasto_' + g.id + '_' + g.mes;
     if (pagoMap[k]) pagos += Number(g.valor);
     else pendentes += Number(g.valor);
   });
 
-  // Parcelas ativas do mês
+  // Parcelas ativas do mês — chave inclui o mês da view
   cache.parcelados.forEach(p => {
     const s = ymToObj(p.inicio);
     const d = (y*12+m) - (s.y*12+s.m);
     if (d >= 0 && d < p.parcelas) {
       const vp = Number(p.total) / Number(p.parcelas);
-      const k  = 'parcelado_' + p.id;
+      const k  = 'parcelado_' + p.id + '_' + ymKey(y, m);
       if (pagoMap[k]) pagos += vp;
       else pendentes += vp;
     }
@@ -1343,7 +1343,17 @@ async function confirmarLancamento() {
   // gasto à vista
   if (!valor || valor <= 0) return alert('Digite o valor.');
   const row = { id:uid(), descricao:desc, valor, cat, mes, tipo:tipoAtual, user_id:currentUser.id };
-  try { await dbInsert('gastos', row); cache.gastos.unshift({...row, desc}); fecharModal(); renderAll(); toast(TIPO_LABELS[tipoAtual]+' adicionado!'); }
+  try {
+    await dbInsert('gastos', row);
+    cache.gastos.unshift({...row, desc});
+    // Débito e Dinheiro já são pagos no ato — marca automaticamente
+    if (tipoAtual === 'debito' || tipoAtual === 'dinheiro') {
+      const map = _loadPagoMap();
+      map['gasto_' + row.id + '_' + mes] = true;
+      _savePagoMap(map);
+    }
+    fecharModal(); renderAll(); toast(TIPO_LABELS[tipoAtual]+' adicionado!');
+  }
   catch(e) { toast('Erro: '+e.message, true); }
 }
 
@@ -1426,8 +1436,18 @@ function _htmlRowRenda(desc, sub, val, extraHtml='') {
   </div>`;
 }
 
-/** Row de gasto simples */
+/** Row de gasto simples — reflete status pago do mapa de lançamentos (chave com mês) */
 function _htmlRowGasto(g) {
+  const pago = !!(_loadPagoMap()['gasto_' + g.id + '_' + (g.mes || '')]);
+  if (pago) {
+    return `<div class="row-pago" style="margin-bottom:6px">
+      <div>
+        <div class="desc" style="text-decoration:line-through">${g.desc} ${_tipoBadge(g.tipo)} <span class="badge badge-gray" style="font-size:10px">pago</span></div>
+        <div class="sub">${g.cat||'Outros'}</div>
+      </div>
+      <span class="val">${fmt(g.valor)}</span>
+    </div>`;
+  }
   return `<div class="row-item">
     <div>
       <div class="gasto-av-desc" style="font-size:14px;font-weight:500">${g.desc} ${_tipoBadge(g.tipo)}</div>
@@ -1440,13 +1460,26 @@ function _htmlRowGasto(g) {
   </div>`;
 }
 
-/** Row de parcelado no resumo */
+/** Row de parcelado no resumo — reflete status pago do mapa de lançamentos (chave com mês) */
 function _htmlRowParcelado(p) {
   const s    = ymToObj(p.inicio);
   const d    = (viewYear*12+viewMonth) - (s.y*12+s.m) + 1;
   const vp   = Number(p.total) / Number(p.parcelas);
   const prev = prevQuit(p);
   const vcto = p.diavcto ? ` · vence dia ${p.diavcto}` : '';
+  const pago = !!(_loadPagoMap()['parcelado_' + p.id + '_' + ymKey(viewYear, viewMonth)]);
+  if (pago) {
+    return `<div class="row-pago" style="margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div class="desc" style="text-decoration:line-through">${p.desc} ${_tipoBadge(p.tipo)} <span class="badge badge-orange">${p.parcelas}x</span> <span class="badge badge-gray" style="font-size:10px">pago</span></div>
+        <div class="sub">${p.cat||'Outros'}${vcto} · faltam ${prev.restantes} parcelas · quitação: ${prev.mes}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:12px">
+        <span style="font-size:17px;font-weight:700;color:#1e40af;line-height:1;letter-spacing:-0.5px">${d}<span style="font-size:13px;font-weight:500;color:#2563eb">/${p.parcelas}x</span></span>
+        <span class="val" style="font-size:18px">${fmt(vp)}/mês</span>
+      </div>
+    </div>`;
+  }
   return `<div class="row-parcelado">
     <div style="flex:1;min-width:0">
       <div class="desc">${p.desc} ${_tipoBadge(p.tipo)}</div>
@@ -1589,7 +1622,7 @@ function renderResumoCompleto() {
 function renderLancamentos() {
   const filtroTipo = el('filtro-tipo-lanc')?.value || '';
 
-  // Monta cacheLancamentos preservando o flag .pago salvo
+  // Monta cacheLancamentos preservando o flag .pago salvo (chave inclui mês)
   const pagoMap = _loadPagoMap();
   cacheLancamentos = [
     ...cache.rendas.map(r     => ({ ...r, _tipo:'renda'     })),
@@ -1598,7 +1631,7 @@ function renderLancamentos() {
   ]
   .filter(i => !filtroTipo || (filtroTipo==='renda' && i._tipo==='renda') || i.tipo===filtroTipo)
   .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''))
-  .map(i => ({ ...i, pago: !!(pagoMap[i._tipo + '_' + i.id]) }));
+  .map(i => ({ ...i, pago: !!(pagoMap[_pagoItemKey(i)]) }));
 
   if (!cacheLancamentos.length) {
     setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>');
@@ -1935,32 +1968,26 @@ function _savePagoMap(map) {
 // Compatibilidade — carregado em mostrarApp mas não bloqueia nada
 function loadPagoGastos() { /* substituído por _loadPagoMap() inline */ }
 
+// Gera chave única por item + mês, evitando persistência entre meses
+function _pagoItemKey(item) {
+  // gastos: vinculado ao próprio mês do lançamento (item.mes já é o mês certo)
+  if (item._tipo === 'gasto')     return 'gasto_'     + item.id + '_' + (item.mes || '');
+  // parcelados: vinculado ao mês da view, pois a mesma parcela aparece em meses diferentes
+  if (item._tipo === 'parcelado') return 'parcelado_' + item.id + '_' + ymKey(viewYear, viewMonth);
+  // rendas: já são únicas por mês
+  return 'renda_' + item.id;
+}
+
 function togglePagoLancamento(index) {
   const item = cacheLancamentos[index];
   if (!item) return;
-  const map  = _loadPagoMap();
-  const key  = item._tipo + '_' + item.id;
+  const map = _loadPagoMap();
+  const key = _pagoItemKey(item);
   if (map[key]) { delete map[key]; item.pago = false; }
   else           { map[key] = true;  item.pago = true;  }
   _savePagoMap(map);
-  // Atualiza lista de lançamentos E métricas do resumo
-  renderLancamentos();
-  // Recalcula métricas pagos/pendentes sem recarregar tudo
-  const { pagos, pendentes } = getGastosPagosPendentes(viewYear, viewMonth);
-  const renda = getRendaDoMes(viewYear, viewMonth);
-  const temDados = pagos > 0 || pendentes > 0;
-  const wrapPago = el('m-pago-wrap');
-  if (wrapPago) wrapPago.style.display = temDados ? '' : 'none';
-  if (temDados) {
-    const dark = isDark();
-    const mGP = el('m-gastos-pagos');
-    if (mGP) { mGP.textContent = fmt(pagos); mGP.style.color = dark ? '#93c5fd' : '#1e40af'; }
-    const mGPend = el('m-gastos-pendentes');
-    if (mGPend) { mGPend.textContent = fmt(pendentes); mGPend.style.color = dark ? '#fb923c' : '#e07b00'; }
-    const projetado = renda - (pagos + pendentes);
-    const mSP = el('m-saldo-projetado');
-    if (mSP) { mSP.textContent = fmt(projetado); mSP.style.color = projetado >= 0 ? '#155724' : '#721c24'; }
-  }
+  // Atualiza lançamentos + Resumo completo (cards pagos/pendentes e rows visuais) em tempo real
+  renderAll();
   toast(item.pago ? '✅ Marcado como pago!' : 'Pagamento desmarcado.');
 }
 

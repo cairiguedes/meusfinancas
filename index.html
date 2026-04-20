@@ -685,6 +685,30 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
     <span class="mes-titulo" id="graf-mes-titulo"></span>
     <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
   </div>
+
+  <!-- GAUGE — Saúde Financeira -->
+  <div class="card">
+    <div class="section-title">Saúde financeira do mês</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <!-- Container do velocímetro — metade da altura do canvas -->
+      <div style="position:relative;width:220px;height:120px;overflow:hidden">
+        <canvas id="gauge-canvas" width="220" height="220" style="position:absolute;top:0;left:0"></canvas>
+        <!-- Texto central sobreposto -->
+        <div id="gauge-pct-label" style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:26px;font-weight:700;color:var(--text)">—</div>
+      </div>
+      <!-- Alerta de déficit -->
+      <div id="gauge-alerta" style="display:none;background:#f8d7da;border:1.5px solid #dc3545;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:#721c24;text-align:center;width:100%;margin-top:4px"></div>
+      <!-- Legenda valores -->
+      <div id="gauge-legenda" style="font-size:13px;color:var(--text2);margin-top:6px;text-align:center"></div>
+      <!-- Escala de referência -->
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center">
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#d4edda;color:#155724;font-weight:500">≤60% Saudável</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#fff3cd;color:#856404;font-weight:500">61–90% Atenção</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#f8d7da;color:#721c24;font-weight:500">≥91% Crítico</span>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="section-title">Gastos por categoria</div>
     <div class="pie-wrap">
@@ -1930,8 +1954,75 @@ function renderHistorico() {
   }).join(''));
 }
 
+function renderGauge() {
+  const canvas = el('gauge-canvas');
+  if (!canvas) return;
+
+  const renda  = getRendaDoMes(viewYear, viewMonth);
+  const gastos = getGastosDoMes(viewYear, viewMonth);
+  const pct    = renda > 0 ? (gastos / renda) * 100 : 0;
+  const pctClamp = Math.min(pct, 100);
+
+  // Cores dinâmicas por faixa
+  let corGasto, corLabel;
+  if (pct <= 60)      { corGasto = '#28a745'; corLabel = '#155724'; }
+  else if (pct <= 90) { corGasto = '#fd7e14'; corLabel = '#7a3f00'; }
+  else                { corGasto = '#dc3545'; corLabel = '#721c24'; }
+
+  // Desenho no canvas — semicírculo inferior (180° → 360°)
+  const ctx = canvas.getContext('2d');
+  const W = 220, H = 220, cx = W/2, cy = H/2, R = 90, LW = 22;
+  ctx.clearRect(0, 0, W, H);
+
+  const startA = Math.PI, endA = 2 * Math.PI, span = Math.PI;
+
+  // Trilha de fundo
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startA, endA);
+  ctx.strokeStyle = isDark() ? '#333' : '#e9ecef';
+  ctx.lineWidth = LW; ctx.lineCap = 'round'; ctx.stroke();
+
+  // Arco de preenchimento
+  if (pctClamp > 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, startA, startA + (pctClamp / 100) * span);
+    ctx.strokeStyle = corGasto;
+    ctx.lineWidth = LW; ctx.lineCap = 'round'; ctx.stroke();
+  }
+
+  // Percentual central
+  const pctLabel = el('gauge-pct-label');
+  if (pctLabel) {
+    pctLabel.textContent = renda > 0 ? Math.round(pct) + '%' : '—';
+    pctLabel.style.color = renda > 0 ? corLabel : 'var(--text2)';
+  }
+
+  // Alerta de déficit
+  const alertaEl = el('gauge-alerta');
+  if (alertaEl) {
+    if (pct > 100 && renda > 0) {
+      alertaEl.textContent = `⚠️ Alerta: Déficit de ${fmt(gastos - renda)} (${Math.round(pct)}% da renda)`;
+      alertaEl.style.display = 'block';
+    } else {
+      alertaEl.style.display = 'none';
+    }
+  }
+
+  // Legenda com valores reais
+  const legEl = el('gauge-legenda');
+  if (legEl) {
+    legEl.innerHTML = renda > 0
+      ? `Renda: <strong style="color:#155724">${fmt(renda)}</strong> &nbsp;|&nbsp; Gastos: <strong style="color:${corGasto}">${fmt(gastos)}</strong>`
+      : 'Sem renda lançada neste mês';
+  }
+}
+
 function renderGraficos() {
   el('graf-mes-titulo').textContent = mesStr(viewYear, viewMonth);
+
+  // Gauge de saúde financeira
+  renderGauge();
+
   const cats  = getGastosPorCat(viewYear, viewMonth);
   const total = cats.reduce((s,[,v]) => s+v, 0);
 

@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0f0f0f"/>
+<link rel="manifest" href='data:application/manifest+json,{"display":"standalone","start_url":"/","name":"Meus Financas","short_name":"Financas"}'/>
 <title>Meus Finanças</title>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────────────── */
@@ -922,11 +924,28 @@ function mostrarApp() {
   document.getElementById('app-content').style.display = 'block';
   document.querySelector('.fab').style.display = '';
   document.getElementById('user-email').textContent = currentUser?.email || '';
+
   loadMetas();
   loadDizimo();
   loadPagoGastos();
   renderConfDizimo();
-  renderSaudacao();
+
+  // Renderiza a saudação com data imediatamente (sem nome por enquanto)
+  renderSaudacao(null);
+
+  // Carrega nome: primeiro tenta cache local para ser instantâneo,
+  // depois confirma com Supabase (sem piscar "Usuário")
+  const nomeCache = localStorage.getItem('mf_nome_' + currentUser.id);
+  if (nomeCache) renderSaudacao(nomeCache);
+
+  // Busca do Supabase em paralelo — atualiza se vier diferente
+  loadNomePerfil().then(nomeRemoto => {
+    if (nomeRemoto) {
+      localStorage.setItem('mf_nome_' + currentUser.id, nomeRemoto);
+      renderSaudacao(nomeRemoto);
+    }
+  });
+
   loadAll();
 }
 
@@ -959,49 +978,74 @@ function initTema() {
 }
 
 // =====================================================================
-// SAUDAÇÃO & NOME DO USUÁRIO
+// SAUDAÇÃO & NOME DO USUÁRIO — sincronizado com Supabase (tabela perfil)
 // =====================================================================
-function _nomeKey() { return 'mf_nome_' + (currentUser?.id || 'x'); }
 
-function getNome() {
-  return localStorage.getItem(_nomeKey()) || 'Usuário';
+// Busca o nome do perfil no Supabase
+async function loadNomePerfil() {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/perfil?user_id=eq.${currentUser.id}&select=nome&limit=1`,
+      { headers: getH() }
+    );
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return rows.length ? (rows[0].nome || null) : null;
+  } catch { return null; }
 }
 
-function renderSaudacao() {
-  const hora = new Date().getHours();
-  const periodo = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const nome = getNome();
+// Salva (upsert) o nome no Supabase
+async function saveNomePerfil(nome) {
+  try {
+    // Upsert via cabeçalho Prefer
+    const headers = {
+      ...getH(),
+      'Prefer': 'resolution=merge-duplicates,return=representation'
+    };
+    await fetch(`${SUPABASE_URL}/rest/v1/perfil`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: currentUser.id, nome })
+    });
+  } catch(e) { console.warn('Erro ao salvar nome no perfil:', e); }
+}
 
-  const elPeriodo = document.getElementById('greeting-periodo');
-  const elNome    = document.getElementById('greeting-nome');
-  const elData    = document.getElementById('greeting-data');
-  const elCfgNome = document.getElementById('cfg-user-name');
+function renderSaudacao(nome) {
+  // Só exibe a saudação após receber o nome real (nunca mostra "Usuário" por padrão)
+  const hora    = new Date().getHours();
+  const periodo = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+
+  const elPeriodo = el('greeting-periodo');
+  const elNome    = el('greeting-nome');
+  const elData    = el('greeting-data');
+  const elCfgNome = el('cfg-user-name');
 
   if (elPeriodo) elPeriodo.textContent = periodo;
-  if (elNome)    elNome.textContent    = nome;
-  if (elCfgNome && elCfgNome.value === '') elCfgNome.value = nome !== 'Usuário' ? nome : '';
+  if (elNome)    elNome.textContent    = nome || '';
+  // Só preenche o campo de config se ainda estiver vazio
+  if (elCfgNome && !elCfgNome.value && nome) elCfgNome.value = nome;
 
   if (elData) {
-    const hoje = new Date();
-    const diaSemana = hoje.toLocaleDateString('pt-BR', { weekday:'long' });
-    const diaMes    = hoje.toLocaleDateString('pt-BR', { day:'numeric', month:'long', year:'numeric' });
-    // capitaliza primeira letra
+    const hoje     = new Date();
+    const diaSemana= hoje.toLocaleDateString('pt-BR', { weekday:'long' });
+    const diaMes   = hoje.toLocaleDateString('pt-BR', { day:'numeric', month:'long', year:'numeric' });
     elData.textContent = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1) + ', ' + diaMes;
   }
 }
 
 function previewNome(val) {
-  // Preview em tempo real enquanto digita
-  const elNome = document.getElementById('greeting-nome');
-  if (elNome) elNome.textContent = val.trim() || 'Usuário';
+  const elNome = el('greeting-nome');
+  if (elNome) elNome.textContent = val.trim() || '';
 }
 
-function salvarNome() {
-  const input = document.getElementById('cfg-user-name');
+async function salvarNome() {
+  const input = el('cfg-user-name');
   const nome  = (input?.value || '').trim();
   if (!nome) return alert('Digite um nome.');
-  localStorage.setItem(_nomeKey(), nome);
-  renderSaudacao();
+  // Salva no Supabase e no localStorage como cache local
+  await saveNomePerfil(nome);
+  localStorage.setItem('mf_nome_' + currentUser.id, nome);
+  renderSaudacao(nome);
   toast('Nome salvo! 👋');
 }
 
@@ -1174,7 +1218,10 @@ function renderConfDizimo() {
   if (cfgEmail) cfgEmail.textContent = currentUser?.email || '';
   // preenche campo nome ao abrir config
   const cfgNome = el('cfg-user-name');
-  if (cfgNome) { const n = getNome(); cfgNome.value = n !== 'Usuário' ? n : ''; }
+  if (cfgNome) {
+    const n = localStorage.getItem('mf_nome_' + (currentUser?.id || 'x')) || '';
+    cfgNome.value = n;
+  }
 }
 
 function getDizimoItens(y, m) {

@@ -7,7 +7,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#0f0f0f"/>
-<link rel="manifest" href='data:application/manifest+json,{"display":"standalone","start_url":"./","name":"Meus Financas","short_name":"Financas"}'/>
+<link rel="manifest" href='data:application/manifest+json,{
+  "display": "standalone",
+  "start_url": "./",
+  "name": "Meus Finanças",
+  "short_name": "Finanças",
+  "icons": [
+    {
+      "src": "logomeuapp.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}'>
+<link rel="apple-touch-icon" href="logomeuapp.png">
 <title>Meus Finanças</title>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────────────── */

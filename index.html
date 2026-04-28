@@ -301,7 +301,69 @@ body.dark .lanc-gasto-desc{color:#f0f0f5 !important}
 body.dark .lanc-gasto-sub{color:#9ca3af !important}
 body.dark .lanc-gasto-val{color:#fca5a5 !important}
 
-/* ── RESPONSIVE ──────────────────────────────────────────────────── */
+/* ── BOTTOM NAV ──────────────────────────────────────────────────── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:600;
+  background:var(--surface);border-top:1px solid var(--border);
+  display:flex;padding-bottom:env(safe-area-inset-bottom,0px);
+  box-shadow:0 -4px 20px rgba(0,0,0,.07);
+}
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:3px;padding:10px 4px 8px;cursor:pointer;border:none;
+  background:transparent;color:var(--text3);font-family:inherit;
+  transition:color .15s;position:relative;
+}
+.bn-item.active{color:var(--accent)}
+.bn-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;transition:stroke .15s}
+.bn-item.active svg{stroke-width:2.2}
+.bn-label{font-size:10px;font-weight:600;letter-spacing:.2px;transition:color .15s}
+.bn-badge{position:absolute;top:7px;right:calc(50% - 16px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:20px;padding:0 5px;min-width:16px;height:16px;line-height:16px;text-align:center}
+/* ocultar tabs antigas no mobile */
+@media(max-width:768px){
+  .tabs{display:none}
+  .tab{padding:.75rem 1rem 7rem}
+  .fab{bottom:80px}
+  .toast{bottom:140px}
+  h1.app-h1{display:none}
+}
+
+/* ── HERO CARD ───────────────────────────────────────────────────── */
+.hero-card{
+  margin:0 0 14px;border-radius:var(--radius);
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+  padding:20px 18px 16px;color:#fff;position:relative;overflow:hidden;
+}
+.hero-card::after{
+  content:'';position:absolute;top:-30px;right:-30px;
+  width:120px;height:120px;border-radius:50%;
+  background:rgba(255,255,255,.08);
+}
+.hero-mes{font-size:11px;font-weight:600;opacity:.75;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+.hero-saldo-label{font-size:12px;opacity:.8;margin-bottom:2px}
+.hero-saldo{font-size:36px;font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:14px}
+.hero-saldo small{font-size:18px;font-weight:500;opacity:.7;margin-left:2px}
+.hero-chips{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hero-chip{background:rgba(255,255,255,.15);border-radius:var(--radius-xs);padding:8px 10px;backdrop-filter:blur(4px)}
+.hero-chip-label{font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:3px}
+.hero-chip-val{font-size:15px;font-weight:700;letter-spacing:-.3px}
+
+/* ── BARRA SAÚDE ─────────────────────────────────────────────────── */
+.saude-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+.saude-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.saude-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.saude-pct{font-size:12px;font-weight:700}
+.saude-track{height:7px;background:var(--metric-bg);border-radius:20px;overflow:hidden}
+.saude-fill{height:100%;border-radius:20px;transition:width .5s ease}
+
+/* ── QUICK ACTIONS ───────────────────────────────────────────────── */
+.quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.qa-btn{display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 4px 10px;cursor:pointer;transition:box-shadow .15s,transform .1s;box-shadow:var(--shadow-sm)}
+.qa-btn:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.qa-btn:active{transform:translateY(0)}
+.qa-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.qa-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.qa-label{font-size:10px;font-weight:600;color:var(--text2);text-align:center;letter-spacing:.2px}
 @media(max-width:480px){
   .form-grid{grid-template-columns:1fr}
   .form-grid.three{grid-template-columns:1fr}
@@ -321,7 +383,7 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
 </style>
 </head>
 <body>
-<h1>💰 Meus Finanças</h1>
+<h1 class="app-h1">💰 Meus Finanças</h1>
 
 <!-- TELA DE LOGIN -->
 <div id="tela-login" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:2000;align-items:center;justify-content:center;padding:1rem">
@@ -517,26 +579,84 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
 
 <!-- ABA RESUMO -->
 <div id="tab-resumo" class="tab active">
-  <div class="nav-month">
+
+  <!-- HERO SALDO -->
+  <div class="hero-card">
+    <div class="hero-mes" id="hero-mes-label">Carregando...</div>
+    <div class="hero-saldo-label">Saldo atual</div>
+    <div class="hero-saldo" id="hero-saldo">R$ 0<small>,00</small></div>
+    <div class="hero-chips">
+      <div class="hero-chip">
+        <div class="hero-chip-label">Renda</div>
+        <div class="hero-chip-val" id="hero-renda">R$ 0</div>
+      </div>
+      <div class="hero-chip">
+        <div class="hero-chip-label">Gastos</div>
+        <div class="hero-chip-val" id="hero-gastos">R$ 0</div>
+      </div>
+      <div class="hero-chip" id="hero-dizimo-chip" style="display:none">
+        <div class="hero-chip-label">Dízimo</div>
+        <div class="hero-chip-val" id="hero-dizimo">R$ 0</div>
+      </div>
+      <div class="hero-chip" id="hero-saldo-chip" style="display:none">
+        <div class="hero-chip-label">Líquido</div>
+        <div class="hero-chip-val" id="hero-liquido">R$ 0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DE SAÚDE FINANCEIRA -->
+  <div class="saude-wrap">
+    <div class="saude-header">
+      <span class="saude-title">Saúde financeira</span>
+      <span class="saude-pct" id="saude-pct">—</span>
+    </div>
+    <div class="saude-track">
+      <div class="saude-fill" id="saude-fill" style="width:0%;background:#22c55e"></div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="quick-actions">
+    <button class="qa-btn" onclick="abrirModal()">
+      <div class="qa-icon" style="background:#eff6ff"><svg viewBox="0 0 24 24" style="stroke:#3b6ef6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      <span class="qa-label">Lançar</span>
+    </button>
+    <button class="qa-btn" onclick="setTab('rendas')">
+      <div class="qa-icon" style="background:#f0fdf4"><svg viewBox="0 0 24 24" style="stroke:#22c55e"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <span class="qa-label">Rendas</span>
+    </button>
+    <button class="qa-btn" onclick="setTab('metas')">
+      <div class="qa-icon" style="background:#fef9c3"><svg viewBox="0 0 24 24" style="stroke:#ca8a04"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+      <span class="qa-label">Metas</span>
+    </button>
+    <button class="qa-btn" onclick="setTab('historico')">
+      <div class="qa-icon" style="background:#faf5ff"><svg viewBox="0 0 24 24" style="stroke:#9333ea"><path d="M3 3v18h18"/><polyline points="7 16 11 12 15 14 19 8"/></svg></div>
+      <span class="qa-label">Histórico</span>
+    </button>
+  </div>
+
+  <!-- Navegação de mês (compacta) -->
+  <div class="nav-month" style="margin-bottom:10px">
     <button class="nav-btn" onclick="changeMonth(-1)">&#8249;</button>
     <span class="mes-titulo" id="mes-titulo"></span>
     <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
   </div>
 
-  <!-- Card de quitação — aparece só quando há parcelados terminando no mês -->
+  <!-- Card de quitação -->
   <div id="card-quitar" style="display:none"></div>
-  <div class="metrics">
-    <div class="metric"><div class="metric-label">Renda do mês</div><div class="metric-value" id="m-renda" style="color:#155724">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">Total de gastos</div><div class="metric-value" id="m-gastos" style="color:#721c24">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">Saldo atual</div><div class="metric-value" id="m-saldo">R$ 0</div></div>
-    <div class="metric" id="m-dizimo-wrap" style="display:none"><div class="metric-label">Dízimo pendente</div><div class="metric-value" id="m-dizimo" style="color:#7c3aed">R$ 0</div></div>
-    <div class="metric" id="m-liquido-wrap" style="display:none"><div class="metric-label">Líquido</div><div class="metric-value" id="m-liquido">R$ 0</div></div>
-  </div>
-  <!-- Métricas de pagos/pendentes -->
+
+  <!-- Métricas detalhadas (desktop / scroll) -->
   <div class="metrics" id="m-pago-wrap" style="display:none">
-    <div class="metric"><div class="metric-label">💚 Gastos pagos</div><div class="metric-value" id="m-gastos-pagos" style="color:#1e40af">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">🟠 Gastos pendentes</div><div class="metric-value" id="m-gastos-pendentes" style="color:#e07b00">R$ 0</div></div>
-    <div class="metric"><div class="metric-label">Saldo projetado</div><div class="metric-value" id="m-saldo-projetado">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">💚 Pagos</div><div class="metric-value" id="m-gastos-pagos" style="color:#1e40af">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">🟠 Pendentes</div><div class="metric-value" id="m-gastos-pendentes" style="color:#e07b00">R$ 0</div></div>
+    <div class="metric"><div class="metric-label">Projetado</div><div class="metric-value" id="m-saldo-projetado">R$ 0</div></div>
+  </div>
+
+  <!-- Métricas legacy (mantidas para compatibilidade JS) -->
+  <div style="display:none">
+    <span id="m-renda"></span><span id="m-gastos"></span><span id="m-saldo"></span>
+    <span id="m-dizimo-wrap"></span><span id="m-dizimo"></span><span id="m-liquido-wrap"></span><span id="m-liquido"></span>
   </div>
   <div class="legenda">
     <div class="leg-item"><div class="leg-dot" style="background:#d4edda;border-color:#28a745"></div>Renda</div>
@@ -830,6 +950,31 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
     </div>
   </div>
 </div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bn-item active" id="bn-resumo" onclick="setTab('resumo')">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="bn-label">Resumo</span>
+  </button>
+  <button class="bn-item" id="bn-lancamentos" onclick="setTab('lancamentos')">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span class="bn-label">Lançamentos</span>
+  </button>
+  <button class="bn-item" id="bn-contas-nav" onclick="setTab('contas')">
+    <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    <span class="bn-label">Contas</span>
+    <span class="bn-badge" id="bn-badge-contas" style="display:none"></span>
+  </button>
+  <button class="bn-item" id="bn-graficos" onclick="setTab('graficos')">
+    <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="bn-label">Gráficos</span>
+  </button>
+  <button class="bn-item" id="bn-mais" onclick="setTab('configuracoes')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    <span class="bn-label">Perfil</span>
+  </button>
+</nav>
 
 </div><!-- fim app-content -->
 <div class="toast" id="toast"></div>
@@ -1451,16 +1596,45 @@ function changeMonth(d) {
   renderAll();
 }
 
+// Atualiza o badge de contas pendentes no nav inferior
+function atualizarBadgeNav() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const pend = cache.contas.filter(c => {
+    if (c.pago) return false;
+    return Math.ceil((new Date(c.venc+'T12:00:00') - hoje) / 86400000) <= 7;
+  }).length;
+  const badge = el('bn-badge-contas');
+  if (badge) {
+    badge.style.display = pend > 0 ? '' : 'none';
+    badge.textContent   = pend > 0 ? pend : '';
+  }
+  // badge antigo da aba de contas (desktop)
+  const btnContas = el('btn-contas');
+  if (btnContas) {
+    let b = btnContas.querySelector('.tab-badge');
+    if (pend > 0) {
+      if (!b) { b = document.createElement('span'); b.className = 'tab-badge'; btnContas.appendChild(b); }
+      b.textContent = pend;
+    } else { if (b) b.remove(); }
+  }
+}
+
 function setTab(t) {
   document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  el('tab-'+t).classList.add('active');
-  TABS.forEach((name,i) => { if (name===t) document.querySelectorAll('.tab-btn')[i].classList.add('active'); });
+  const tabEl = el('tab-'+t); if (tabEl) tabEl.classList.add('active');
+  TABS.forEach((name,i) => { if (name===t) document.querySelectorAll('.tab-btn')[i]?.classList.add('active'); });
+
+  // Sincroniza bottom nav
+  const navMap = { resumo:'bn-resumo', lancamentos:'bn-lancamentos', contas:'bn-contas-nav', graficos:'bn-graficos', configuracoes:'bn-mais' };
+  document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
+  const bnActive = el(navMap[t]); if (bnActive) bnActive.classList.add('active');
+
   populateSelects();
-  if (t === 'graficos')     renderGraficos();
-  if (t === 'metas')        renderMetas();
+  if (t === 'graficos')      renderGraficos();
+  if (t === 'metas')         renderMetas();
   if (t === 'configuracoes') renderConfDizimo();
-  if (t === 'rendas')       renderRendas();
+  if (t === 'rendas')        renderRendas();
 }
 
 // =====================================================================
@@ -1857,39 +2031,84 @@ function renderCardQuitar() {
 }
 
 function renderAll() {
-  el('mes-titulo').textContent = mesStr(viewYear, viewMonth);
   const renda  = getRendaDoMes(viewYear, viewMonth);
   const gastos = getGastosDoMes(viewYear, viewMonth);
   const saldo  = renda - gastos;
 
-  // Métricas principais
-  el('m-renda').textContent  = fmt(renda);
-  el('m-gastos').textContent = fmt(gastos);
-  const ms = el('m-saldo');
-  ms.textContent = fmt(saldo);
-  ms.style.color = saldo >= 0 ? '#155724' : '#721c24';
-  // Renomear label saldo para "Saldo atual"
-  const msLabel = ms.previousElementSibling;
-  if (msLabel) msLabel.textContent = 'Saldo atual';
+  // ── Mês título (nav compacto)
+  const mesLabel = mesStr(viewYear, viewMonth);
+  const mesTit = el('mes-titulo'); if (mesTit) mesTit.textContent = mesLabel;
 
-  // Métricas pagos / pendentes
+  // ── Hero card
+  const heroMes = el('hero-mes-label');
+  if (heroMes) heroMes.textContent = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
+
+  const heroSaldo = el('hero-saldo');
+  if (heroSaldo) {
+    const partes = fmt(saldo).replace('R$ ','').split(',');
+    heroSaldo.innerHTML = `R$ ${partes[0]}<small>,${partes[1]||'00'}</small>`;
+    heroSaldo.style.opacity = saldo < 0 ? '.7' : '1';
+  }
+
+  const heroRenda  = el('hero-renda');  if (heroRenda)  heroRenda.textContent  = fmt(renda);
+  const heroGastos = el('hero-gastos'); if (heroGastos) heroGastos.textContent = fmt(gastos);
+
+  // Dízimo no hero
+  if (dizimoAtivo()) {
+    const { pendente } = getDizimoTotais(viewYear, viewMonth);
+    const liquido = saldo - pendente;
+    const hdC = el('hero-dizimo-chip'); if (hdC) hdC.style.display = '';
+    const hd  = el('hero-dizimo');      if (hd)  hd.textContent = fmt(pendente);
+    const hsC = el('hero-saldo-chip');  if (hsC) hsC.style.display = '';
+    const hl  = el('hero-liquido');     if (hl)  hl.textContent = fmt(liquido);
+    // métricas legacy
+    const mDizWrap = el('m-dizimo-wrap'); if (mDizWrap) mDizWrap.style.display = '';
+    const mDiz     = el('m-dizimo');      if (mDiz)     mDiz.textContent = fmt(pendente);
+    const mLiqWrap = el('m-liquido-wrap');if (mLiqWrap) mLiqWrap.style.display = '';
+    const mLiq     = el('m-liquido');
+    if (mLiq) { mLiq.textContent = fmt(liquido); mLiq.style.color = liquido >= 0 ? '#155724' : '#721c24'; }
+  } else {
+    ['hero-dizimo-chip','hero-saldo-chip','m-dizimo-wrap','m-liquido-wrap'].forEach(id => {
+      const e = el(id); if (e) e.style.display = 'none';
+    });
+  }
+
+  // ── Barra de saúde financeira
+  const pct    = renda > 0 ? Math.min((gastos / renda) * 100, 100) : 0;
+  const pctReal= renda > 0 ? Math.round((gastos / renda) * 100) : 0;
+  let saudeCor, saudeLabel;
+  if      (pctReal <= 60) { saudeCor = '#22c55e'; saudeLabel = pctReal + '% · Saudável 🟢'; }
+  else if (pctReal <= 90) { saudeCor = '#f59e0b'; saudeLabel = pctReal + '% · Atenção 🟡'; }
+  else                    { saudeCor = '#ef4444'; saudeLabel = pctReal + '% · Crítico 🔴'; }
+  const saudeFill = el('saude-fill');
+  if (saudeFill) { saudeFill.style.width = pct + '%'; saudeFill.style.background = saudeCor; }
+  const saudePct = el('saude-pct');
+  if (saudePct) { saudePct.textContent = renda > 0 ? saudeLabel : '—'; saudePct.style.color = saudeCor; }
+
+  // ── Métricas legacy (ocultas mas usadas por renderDizimo etc)
+  const mRenda = el('m-renda'); if (mRenda) mRenda.textContent = fmt(renda);
+  const mGast  = el('m-gastos');if (mGast)  mGast.textContent  = fmt(gastos);
+  const mSaldo = el('m-saldo');
+  if (mSaldo) { mSaldo.textContent = fmt(saldo); mSaldo.style.color = saldo >= 0 ? '#155724' : '#721c24'; }
+
+  // ── Pagos / pendentes
   const { pagos, pendentes } = getGastosPagosPendentes(viewYear, viewMonth);
   const temDados = pagos > 0 || pendentes > 0;
   const wrapPago = el('m-pago-wrap');
   if (wrapPago) wrapPago.style.display = temDados ? '' : 'none';
   if (temDados) {
-    // Gastos pagos — azul (mode safe)
     const dark = isDark();
     const mGP = el('m-gastos-pagos');
     if (mGP) { mGP.textContent = fmt(pagos); mGP.style.color = dark ? '#93c5fd' : '#1e40af'; }
-    // Gastos pendentes — laranja
     const mGPend = el('m-gastos-pendentes');
     if (mGPend) { mGPend.textContent = fmt(pendentes); mGPend.style.color = dark ? '#fb923c' : '#e07b00'; }
-    // Saldo projetado = renda − (pagos + pendentes)
     const projetado = renda - (pagos + pendentes);
     const mSP = el('m-saldo-projetado');
     if (mSP) { mSP.textContent = fmt(projetado); mSP.style.color = projetado >= 0 ? '#155724' : '#721c24'; }
   }
+
+  // ── Badge nav contas
+  atualizarBadgeNav();
 
   populateSelects();
   renderCardQuitar();

@@ -1451,37 +1451,54 @@ function renderDizimo() {
   if (!card) return;
   const ativo = dizimoAtivo();
   card.style.display = ativo ? 'block' : 'none';
-  el('m-dizimo-wrap').style.display = ativo ? '' : 'none';
-  el('m-liquido-wrap').style.display = ativo ? '' : 'none';
+
+  // Chips do hero (novo layout)
+  const hdC = el('hero-dizimo-chip'); if (hdC) hdC.style.display = ativo ? '' : 'none';
+  const hsC = el('hero-saldo-chip');  if (hsC) hsC.style.display = ativo ? '' : 'none';
+
+  // Métricas legacy (podem estar ocultas — acessa de forma segura)
+  const mDW = el('m-dizimo-wrap');  if (mDW) mDW.style.display = ativo ? '' : 'none';
+  const mLW = el('m-liquido-wrap'); if (mLW) mLW.style.display = ativo ? '' : 'none';
+
   if (!ativo) return;
 
   const { itens, totalDev, totalRec, pendente } = getDizimoTotais(viewYear, viewMonth);
-  const todos = itens.length;
+  const todos      = itens.length;
   const recolhidos = itens.filter(i => i.recolhido).length;
 
-  // badge resumo
+  // Badge do card
   const badge = el('dizimo-badge');
   if (badge) {
-    if      (todos === 0)          { badge.textContent='Sem rendas';              badge.style.background='var(--metric-bg)'; badge.style.color='var(--text2)'; }
-    else if (recolhidos === todos)  { badge.textContent='✅ Todos recolhidos';     badge.style.background='#d4edda'; badge.style.color='#155724'; }
-    else if (recolhidos === 0)      { badge.textContent='⏳ Nenhum recolhido';    badge.style.background='#fff3cd'; badge.style.color='#856404'; }
-    else                            { badge.textContent=`⏳ ${recolhidos}/${todos} recolhidos`; badge.style.background='#fff3cd'; badge.style.color='#856404'; }
+    if      (todos === 0)           { badge.textContent = 'Sem rendas';             badge.style.background = 'var(--metric-bg)'; badge.style.color = 'var(--text2)'; }
+    else if (recolhidos === todos)  { badge.textContent = '✅ Todos recolhidos';    badge.style.background = '#d4edda'; badge.style.color = '#155724'; }
+    else if (recolhidos === 0)      { badge.textContent = '⏳ Nenhum recolhido';   badge.style.background = '#fff3cd'; badge.style.color = '#856404'; }
+    else                            { badge.textContent = `⏳ ${recolhidos}/${todos} recolhidos`; badge.style.background = '#fff3cd'; badge.style.color = '#856404'; }
   }
 
-  // totais no card
+  // Totais no card
   setHtml('dizimo-resumo-totais', `
-    <div class="metric" style="min-width:80px"><div class="metric-label">Total devido</div><div class="metric-value" style="color:#7c3aed;font-size:17px">${fmt(totalDev)}</div></div>
-    <div class="metric" style="min-width:80px"><div class="metric-label">Recolhido</div><div class="metric-value" style="color:#16a34a;font-size:17px">${fmt(totalRec)}</div></div>
-    <div class="metric" style="min-width:80px"><div class="metric-label">Pendente</div><div class="metric-value" style="color:${pendente>0?'#c0392b':'#16a34a'};font-size:17px">${fmt(pendente)}</div></div>
+    <div class="metric" style="min-width:80px">
+      <div class="metric-label">Total devido</div>
+      <div class="metric-value" style="color:#7c3aed;font-size:17px">${fmt(totalDev)}</div>
+    </div>
+    <div class="metric" style="min-width:80px">
+      <div class="metric-label">Recolhido</div>
+      <div class="metric-value" style="color:#16a34a;font-size:17px">${fmt(totalRec)}</div>
+    </div>
+    <div class="metric" style="min-width:80px">
+      <div class="metric-label">Pendente</div>
+      <div class="metric-value" style="color:${pendente>0?'#c0392b':'#16a34a'};font-size:17px">${fmt(pendente)}</div>
+    </div>
   `);
 
-  // lista individual de itens
+  // Lista individual
   setHtml('dizimo-lista-itens', itens.length
     ? itens.map(i => _htmlDizimoItem(i)).join('')
     : '<div class="empty">Nenhuma renda lançada este mês</div>'
   );
 
-  // métricas topo
+  // Atualiza chips do hero com valores reais
+  const hd = el('hero-dizimo'); if (hd) hd.textContent = fmt(pendente);
   atualizarMetricasDizimo();
 }
 

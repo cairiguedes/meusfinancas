@@ -688,14 +688,13 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
 <!-- ABA LANÇAMENTOS -->
 <div id="tab-lancamentos" class="tab">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-top:4px">
-    <span style="font-size:13px;color:var(--text2)">Todos os lançamentos</span>
+    <span style="font-size:13px;color:var(--text2)" id="lanc-mes-label"></span>
     <select id="filtro-tipo-lanc" onchange="renderLancamentos()" style="width:auto;font-size:12px;padding:5px 8px">
-      <option value="">Todos os tipos</option>
+      <option value="">Todos</option>
       <option value="debito">Débito</option>
       <option value="dinheiro">Dinheiro</option>
       <option value="credito">Crédito</option>
       <option value="emprestimo">Empréstimo</option>
-      <option value="renda">Renda</option>
     </select>
   </div>
   <!-- Card de edição inline -->
@@ -725,7 +724,24 @@ body.dark .lanc-gasto-val{color:#fca5a5 !important}
     <button id="btn-salvar-edicao" class="add-btn" onclick="salvarEdicao()" style="margin-top:8px;background:#3b82f6;border-color:#3b82f6">Salvar Alterações</button>
     <button class="sec-btn" onclick="cancelarEdicao()">Cancelar</button>
   </div>
-  <div class="card"><div id="lista-lancamentos"><div class="loading">Carregando...</div></div></div>
+
+  <!-- Seção Rendas -->
+  <div class="card" id="card-lanc-rendas">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0">💰 Rendas do mês</div>
+      <span id="lanc-rendas-total" style="font-size:13px;font-weight:700;color:#15803d"></span>
+    </div>
+    <div id="lista-lanc-rendas"><div class="loading">Carregando...</div></div>
+  </div>
+
+  <!-- Seção Despesas -->
+  <div class="card" id="card-lanc-despesas">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0">💸 Despesas do mês</div>
+      <span id="lanc-despesas-total" style="font-size:13px;font-weight:700;color:#b91c1c"></span>
+    </div>
+    <div id="lista-lanc-despesas"><div class="loading">Carregando...</div></div>
+  </div>
 </div>
 
 <!-- ABA RENDAS -->
@@ -2199,24 +2215,14 @@ function renderResumoCompleto() {
 
 function renderLancamentos() {
   const filtroTipo = el('filtro-tipo-lanc')?.value || '';
+  const pagoMap    = _loadPagoMap();
+  const keyMes     = ymKey(viewYear, viewMonth);
 
-  // Monta cacheLancamentos preservando o flag .pago salvo (chave inclui mês)
-  const pagoMap = _loadPagoMap();
-  cacheLancamentos = [
-    ...cache.rendas.map(r     => ({ ...r, _tipo:'renda'     })),
-    ...cache.gastos.map(g     => ({ ...g, _tipo:'gasto'     })),
-    ...cache.parcelados.map(p => ({ ...p, _tipo:'parcelado' }))
-  ]
-  .filter(i => !filtroTipo || (filtroTipo==='renda' && i._tipo==='renda') || i.tipo===filtroTipo)
-  .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''))
-  .map(i => ({ ...i, pago: !!(pagoMap[_pagoItemKey(i)]) }));
+  // Label do mês no topo
+  const lancMesLabel = el('lanc-mes-label');
+  if (lancMesLabel) lancMesLabel.textContent = mesStr(viewYear, viewMonth);
 
-  if (!cacheLancamentos.length) {
-    setHtml('lista-lancamentos','<div class="empty">Nenhum lançamento encontrado</div>');
-    return;
-  }
-
-  // Mapa de ícone + cor por categoria
+  // Mapa de ícone por categoria
   const CAT_ICON = {
     'Alimentação':['🍔','#f97316','#fff7ed'],'Transporte':['🚗','#3b82f6','#eff6ff'],
     'Saúde':['💊','#ec4899','#fdf2f8'],'Lazer':['🎮','#8b5cf6','#f5f3ff'],
@@ -2232,64 +2238,137 @@ function renderLancamentos() {
     return `<div class="lanc-icon" style="background:${bg};color:${color}">${icon}</div>`;
   }
 
-  setHtml('lista-lancamentos', cacheLancamentos.slice(0,50).map((item, index) => {
-    const isPago   = item.pago === true;
-    const checkBtn = isPago
-      ? `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Desmarcar pago" style="border-color:#3b82f6;color:#1d4ed8;background:#dbeafe">✅</button>`
-      : `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Marcar como pago">☐</button>`;
-    const editBtn = _editBtn(`prepararEdicao(${index})`);
-    const cardCls = isPago ? 'lanc-card is-pago' : 'lanc-card';
+  // ── RENDAS do mês (sem checkbox de pago, sem filtro de tipo) ──
+  const rendasMes = [
+    ...cache.rendas.filter(r => r.mes === keyMes).map(r => ({ ...r, _tipo:'renda' })),
+    ...rfDoMes(viewYear, viewMonth).map(rf => ({ ...rf, _tipo:'renda-fixa', desc: rf.desc || rf.descricao }))
+  ].sort((a,b) => (a.desc||'').localeCompare(b.desc||''));
 
-    // — RENDA —
-    if (item._tipo === 'renda') {
-      const [,color] = CAT_ICON[item.cat] || CAT_ICON['renda'];
-      return `<div class="${cardCls}">
-        ${checkBtn}
-        ${_catIcon(item.cat, 'renda')}
-        <div class="lanc-body">
-          <div class="lanc-title">${item.desc}</div>
-          <div class="lanc-sub">${item.mes} · ${item.cat||'Renda'} · <span class="badge badge-green">renda</span></div>
-        </div>
-        <div class="lanc-right">
-          <span class="lanc-valor" style="color:#15803d">${fmt(item.valor)}</span>
-          <div class="lanc-actions">${editBtn}${_delBtn('rendas',item.id)}</div>
-        </div>
-      </div>`;
-    }
+  let totalRendas = 0;
+  const htmlRendas = rendasMes.length
+    ? rendasMes.map(item => {
+        totalRendas += Number(item.valor);
+        const editBtn = item._tipo === 'renda-fixa'
+          ? _editBtn(`prepararEdicaoRendaFixa('${item.id}')`)
+          : _editBtn(`prepararEdicaoRendaExtra('${item.id}')`);
+        const delKey = item._tipo === 'renda-fixa' ? 'rendaFixa' : 'rendas';
+        const badge  = item._tipo === 'renda-fixa'
+          ? '<span class="badge badge-green" style="font-size:10px">fixa</span>'
+          : '<span class="badge badge-green" style="font-size:10px">extra</span>';
+        const subInfo = item._tipo === 'renda-fixa'
+          ? `${item.cat||'Renda'} · desde ${item.inicio}${item.fim?' até '+item.fim:''}`
+          : `${item.mes} · ${item.cat||'Renda'}`;
+        return `<div class="lanc-card">
+          ${_catIcon(item.cat,'renda')}
+          <div class="lanc-body">
+            <div class="lanc-title">${item.desc} ${badge}</div>
+            <div class="lanc-sub">${subInfo}</div>
+          </div>
+          <div class="lanc-right">
+            <span class="lanc-valor" style="color:#15803d">${fmt(item.valor)}</span>
+            <div class="lanc-actions">${editBtn}${_delBtn(delKey, item.id)}</div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty">Nenhuma renda neste mês</div>';
 
-    // — GASTO À VISTA —
-    if (item._tipo === 'gasto') {
-      const valColor = isPago ? '#1d4ed8' : '#b91c1c';
-      return `<div class="${cardCls}">
-        ${checkBtn}
-        ${_catIcon(item.cat, item.tipo)}
-        <div class="lanc-body">
-          <div class="lanc-title">${item.desc} ${_tipoBadge(item.tipo)}</div>
-          <div class="lanc-sub">${item.mes} · ${item.cat||'Outros'}</div>
-        </div>
-        <div class="lanc-right">
-          <span class="lanc-valor" style="color:${valColor}">${fmt(item.valor)}</span>
-          <div class="lanc-actions">${editBtn}${_delBtn('gastos',item.id)}</div>
-        </div>
-      </div>`;
-    }
+  setHtml('lista-lanc-rendas', htmlRendas);
+  const rendTotal = el('lanc-rendas-total');
+  if (rendTotal) rendTotal.textContent = totalRendas > 0 ? fmt(totalRendas) : '';
 
-    // — PARCELADO —
-    const vp = Number(item.total) / Number(item.parcelas);
-    const valColor = isPago ? '#1d4ed8' : '#9a3412';
-    return `<div class="${cardCls}">
-      ${checkBtn}
-      ${_catIcon(item.cat, 'parcelado')}
-      <div class="lanc-body">
-        <div class="lanc-title">${item.desc} ${_tipoBadge(item.tipo)} <span class="badge badge-orange">${item.parcelas}x</span></div>
-        <div class="lanc-sub">${item.inicio} · ${item.cat||'Outros'}${item.diavcto?' · vence dia '+item.diavcto:''}</div>
-      </div>
-      <div class="lanc-right">
-        <span class="lanc-valor" style="color:${valColor}">${fmt(vp)}/mês</span>
-        <div class="lanc-actions">${editBtn}${_delBtn('parcelados',item.id)}</div>
-      </div>
-    </div>`;
-  }).join(''));
+  // ── DESPESAS do mês (gastos + parcelados, com checkbox e filtro) ──
+  const despesasBase = [
+    ...cache.gastos.filter(g => g.mes === keyMes).map(g => ({ ...g, _tipo:'gasto' })),
+    ...cache.parcelados.map(p => {
+      const s = ymToObj(p.inicio);
+      const d = (viewYear*12+viewMonth) - (s.y*12+s.m);
+      if (d < 0 || d >= Number(p.parcelas)) return null;
+      return { ...p, _tipo:'parcelado' };
+    }).filter(Boolean)
+  ]
+  .filter(i => !filtroTipo || i.tipo === filtroTipo)
+  .sort((a,b) => (b.mes||b.inicio||'').localeCompare(a.mes||a.inicio||''));
+
+  // Reconstrói cacheLancamentos só com despesas para manter índices do togglePago
+  cacheLancamentos = despesasBase.map(i => ({ ...i, pago: !!(pagoMap[_pagoItemKey(i)]) }));
+
+  let totalDespesas = 0;
+  const htmlDespesas = cacheLancamentos.length
+    ? cacheLancamentos.map((item, index) => {
+        const isPago   = item.pago === true;
+        const checkBtn = isPago
+          ? `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Desmarcar pago" style="border-color:#3b82f6;color:#1d4ed8;background:#dbeafe">✅</button>`
+          : `<button class="list-action-btn" onclick="togglePagoLancamento(${index})" title="Marcar como pago">☐</button>`;
+        const editBtn  = _editBtn(`prepararEdicao(${index})`);
+        const cardCls  = isPago ? 'lanc-card is-pago' : 'lanc-card';
+
+        // Gasto à vista
+        if (item._tipo === 'gasto') {
+          totalDespesas += Number(item.valor);
+          const valColor = isPago ? '#1d4ed8' : '#b91c1c';
+          return `<div class="${cardCls}">
+            ${checkBtn}${_catIcon(item.cat, item.tipo)}
+            <div class="lanc-body">
+              <div class="lanc-title">${item.desc} ${_tipoBadge(item.tipo)}</div>
+              <div class="lanc-sub">${item.mes} · ${item.cat||'Outros'}</div>
+            </div>
+            <div class="lanc-right">
+              <span class="lanc-valor" style="color:${valColor}">${fmt(item.valor)}</span>
+              <div class="lanc-actions">${editBtn}${_delBtn('gastos',item.id)}</div>
+            </div>
+          </div>`;
+        }
+
+        // Parcelado com accordion
+        const s    = ymToObj(item.inicio);
+        const diff = (viewYear*12+viewMonth) - (s.y*12+s.m);
+        const parcelaAtual = diff + 1;
+        const vp   = Number(item.total) / Number(item.parcelas);
+        const prev = prevQuit(item);
+        totalDespesas += vp;
+        const valColor  = isPago ? '#1d4ed8' : '#9a3412';
+        const accordId  = 'acc-' + item.id;
+        const vcto      = item.diavcto ? ` · vence dia ${item.diavcto}` : '';
+        const restantes = Number(item.parcelas) - parcelaAtual;
+
+        return `<div class="${cardCls}" style="cursor:pointer" onclick="toggleAccordion('${accordId}')">
+            ${checkBtn}${_catIcon(item.cat,'parcelado')}
+            <div class="lanc-body">
+              <div class="lanc-title">${item.desc} ${_tipoBadge(item.tipo)}</div>
+              <div class="lanc-sub"><span class="badge badge-orange">${parcelaAtual}/${item.parcelas}x</span> ${item.cat||'Outros'}${vcto}</div>
+            </div>
+            <div class="lanc-right">
+              <span class="lanc-valor" style="color:${valColor}">${fmt(vp)}/mês</span>
+              <span style="font-size:10px;color:var(--text3);margin-top:2px;display:block;text-align:right">▾ detalhes</span>
+            </div>
+          </div>
+          <div id="${accordId}" class="acc-body" style="display:none">
+            <div class="acc-row"><span class="acc-label">Valor total</span><span class="acc-val">${fmt(item.total)}</span></div>
+            <div class="acc-row"><span class="acc-label">Valor da parcela</span><span class="acc-val">${fmt(vp)}</span></div>
+            <div class="acc-row"><span class="acc-label">Parcela atual</span><span class="acc-val">${parcelaAtual} de ${item.parcelas}</span></div>
+            <div class="acc-row"><span class="acc-label">Parcelas restantes</span><span class="acc-val">${restantes}</span></div>
+            <div class="acc-row"><span class="acc-label">Quitação prevista</span><span class="acc-val">${prev.mes}</span></div>
+            ${item.diavcto?`<div class="acc-row"><span class="acc-label">Vencimento</span><span class="acc-val">Todo dia ${item.diavcto}</span></div>`:''}
+            <div class="acc-row"><span class="acc-label">Categoria</span><span class="acc-val">${item.cat||'Outros'}</span></div>
+            <div class="acc-actions">${editBtn}${_delBtn('parcelados',item.id)}</div>
+          </div>`;
+      }).join('')
+    : '<div class="empty">Nenhuma despesa neste mês</div>';
+
+  setHtml('lista-lanc-despesas', htmlDespesas);
+  const despTotal = el('lanc-despesas-total');
+  if (despTotal) despTotal.textContent = totalDespesas > 0 ? fmt(totalDespesas) : '';
+}
+
+function toggleAccordion(id) {
+  const body = el(id); if (!body) return;
+  const aberto = body.style.display !== 'none';
+  body.style.display = aberto ? 'none' : 'block';
+  const card = body.previousElementSibling;
+  if (card) {
+    const seta = card.querySelector('.lanc-right span:last-child');
+    if (seta) seta.textContent = aberto ? '▾ detalhes' : '▴ fechar';
+  }
 }
 
 function renderRendas() {
@@ -2305,7 +2384,11 @@ function renderRendas() {
       : '<div class="empty">Nenhuma renda fixa cadastrada<br><span style="font-size:12px">Use + Novo lançamento → Rendas → Renda fixa</span></div>'
     );
   }
-  const extras = [...cache.rendas].sort((a,b) => (b.mes||'').localeCompare(a.mes||''));
+  // Filtra extras apenas do mês visualizado
+  const keyMes = ymKey(viewYear, viewMonth);
+  const extras = [...cache.rendas]
+    .filter(r => r.mes === keyMes)
+    .sort((a,b) => (b.mes||'').localeCompare(a.mes||''));
   setHtml('lista-rendas-extra', extras.length
     ? extras.map(r => _htmlRowRenda(
         `${r.desc} <span class="badge badge-green">⭐ extra</span>`,
@@ -2313,7 +2396,7 @@ function renderRendas() {
         fmt(r.valor),
         _editBtn(`prepararEdicaoRendaExtra('${r.id}')`) + _delBtn('rendas', r.id)
       )).join('')
-    : '<div class="empty">Nenhuma renda extra lançada<br><span style="font-size:12px">Use + Novo lançamento → Rendas → Renda extra</span></div>'
+    : '<div class="empty">Nenhuma renda extra em ' + mesStr(viewYear, viewMonth) + '<br><span style="font-size:12px">Use + Novo lançamento → Rendas → Renda extra</span></div>'
   );
 }
 

@@ -360,6 +360,12 @@ body {
     background: rgba(255, 255, 255, 0.07);
 }
 
+/* Garante contraste adequado em menus select (dropdowns) */
+select.form-input option {
+    background-color: #161c36;
+    color: var(--text-primary);
+}
+
 /* Checkbox estilizado */
 .checkbox-container {
     display: flex;
@@ -753,7 +759,8 @@ body {
     transition: opacity var(--transition-speed);
 }
 
-.transaction-item:hover .transaction-actions {
+.transaction-item:hover .transaction-actions,
+tr:hover .transaction-actions {
     opacity: 1;
 }
 
@@ -1014,3 +1021,104 @@ body {
         justify-content: space-between;
     }
 }
+
+/* =========================================================================
+   NOVAS CLASSES DE UTILIDADE E CONTROLES
+   ========================================================================= */
+
+/* Alinhamento de Formulários Flex */
+.flex-row-align {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.flex-row-align .form-input {
+    flex-grow: 1;
+}
+
+/* Botão inline de adicionar categoria */
+.btn-add-inline {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all var(--transition-speed);
+}
+
+.btn-add-inline:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Badge e Alternador de Status (Pago / Não Pago) */
+.status-badge {
+    cursor: pointer;
+    font-size: 1.15rem;
+    transition: transform var(--transition-speed);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+}
+
+.status-badge:hover {
+    transform: scale(1.2);
+}
+
+.status-badge.pago {
+    color: var(--success);
+}
+
+.status-badge.pendente {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+/* Rótulo de Juros individual */
+.interest-label {
+    font-size: 0.72rem;
+    color: var(--warning);
+    display: block;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+/* Container de alertas de quitação no Dashboard */
+.quit-alert-container {
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.quit-alert-item {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: #fef08a;
+    padding: 12px 18px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    animation: slideDown 0.3s ease-out;
+}
+
+.quit-alert-item i {
+    font-size: 1.1rem;
+    color: var(--warning);
+}
+

@@ -372,10 +372,17 @@ function addMonthsToDateString(dateStr, monthsToAdd) {
 }
 
 /**
- * Helper para gerar um ID de grupo (UUID genérico simples)
+ * Helper para gerar um ID de grupo (UUID v4 válido para PostgreSQL)
  */
 function generateGroupId() {
-    return 'group_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback caso não esteja em contexto seguro (HTTPS/localhost)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
 
 /**

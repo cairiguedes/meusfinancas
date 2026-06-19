@@ -173,8 +173,8 @@ function closeConfigModal() {
 }
 
 function loadConfigIntoInputs() {
-    const url = localStorage.getItem('supabase_url') || '';
-    const key = localStorage.getItem('supabase_anon_key') || '';
+    const url = localStorage.getItem('https://jjpkrdwisfvgdmlprjey.supabase.co') || '';
+    const key = localStorage.getItem('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqcGtyZHdpc2Z2Z2RtbHByamV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3Nzk0OTMsImV4cCI6MjA5MTM1NTQ5M30.Lt1-J6FlC9pIFJ7QHq3WTzkItYJAiaEcjOm7F_726Fw') || '';
     
     document.getElementById('config-url').value = url;
     document.getElementById('config-anon-key').value = key;

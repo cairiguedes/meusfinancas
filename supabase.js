@@ -1,19 +1,27 @@
-/* =========================================================================
-   INTEGRAÇÃO COM SUPABASE - CLIENTE DE BANCO DE DADOS E AUTENTICAÇÃO
-   ========================================================================= */
+// --- CONFIGURAÇÃO FIXA (Substitua pelos seus dados do Supabase se desejar) ---
+const SUPABASE_URL_DEFAULT = "https://jjpkrdwisfvgdmlprjey.supabase.co";
+const SUPABASE_KEY_DEFAULT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqcGtyZHdpc2Z2Z2RtbHByamV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3Nzk0OTMsImV4cCI6MjA5MTM1NTQ5M30.Lt1-J6FlC9pIFJ7QHq3WTzkItYJAiaEcjOm7F_726Fw";
 
 // Instância global do cliente Supabase
 let sbInstance = null;
 
 /**
  * Inicializa ou retorna a instância ativa do Supabase.
- * Lê dinamicamente do localStorage para garantir a portabilidade.
+ * Lê dinamicamente do localStorage ou das constantes fixas acima.
  */
 function getSupabase() {
     if (sbInstance) return sbInstance;
 
-    const url = localStorage.getItem('supabase_url');
-    const anonKey = localStorage.getItem('supabase_anon_key');
+    let url = localStorage.getItem('supabase_url');
+    let anonKey = localStorage.getItem('supabase_anon_key');
+
+    // Usar fallbacks fixos se não estiver configurado no localStorage
+    if (!url && SUPABASE_URL_DEFAULT !== "SUA_URL_AQUI") {
+        url = SUPABASE_URL_DEFAULT;
+    }
+    if (!anonKey && SUPABASE_KEY_DEFAULT !== "SUA_CHAVE_ANON_AQUI") {
+        anonKey = SUPABASE_KEY_DEFAULT;
+    }
 
     if (!url || !anonKey) {
         return null;
@@ -37,11 +45,11 @@ function resetSupabaseInstance() {
 }
 
 /**
- * Verifica se as credenciais mínimas estão configuradas
+ * Verifica se as credenciais mínimas estão configuradas (no localStorage ou no código)
  */
 function isSupabaseConfigured() {
-    const url = localStorage.getItem('supabase_url');
-    const anonKey = localStorage.getItem('supabase_anon_key');
+    const url = localStorage.getItem('supabase_url') || (SUPABASE_URL_DEFAULT !== "SUA_URL_AQUI" ? SUPABASE_URL_DEFAULT : null);
+    const anonKey = localStorage.getItem('supabase_anon_key') || (SUPABASE_KEY_DEFAULT !== "SUA_CHAVE_ANON_AQUI" ? SUPABASE_KEY_DEFAULT : null);
     return !!(url && anonKey);
 }
 
